@@ -14,7 +14,7 @@ st.markdown("Analise os índices de saúde por município e região.")
 # Carregar os dados
 @st.cache_data # Isso faz o site carregar muito mais rápido
 def load_data():
-    df = pd.read_excel('C:/Users/walte/Documents/SISVAN/Banco Geral + PBF 0-5 Anos.xlsx')
+    df = pd.read_excel('Banco Geral + PBF 0-5 Anos.xlsx')
     return df
 
 df = load_data()
@@ -53,3 +53,4 @@ with col2:
 
 st.divider()
 st.write("### Dados Detalhados do Município", df_municipio)
+
