@@ -104,14 +104,12 @@ def _encontrar_pasta_data() -> Path:
     Retorna o Path da primeira pasta encontrada que contenha ao menos um xlsx.
     """
     candidatas = [
-        Path.cwd() / "data",                          # pasta atual/data
-        Path.cwd(),                                    # pasta atual (sem subpasta)
-        Path(__file__).resolve().parent / "data",      # ao lado do app.py/data
+        Path.cwd()                                     # pasta atual (sem subpasta)
         Path(__file__).resolve().parent,               # ao lado do app.py
     ]
     for pasta in candidatas:
         if pasta.exists():
-            xlsx_encontrados = list(pasta.glob("Banco_Geral___PBF*.xlsx"))
+            xlsx_encontrados = list(pasta.glob("Banco Geral + PBF*.xlsx"))
             if xlsx_encontrados:
                 return pasta
     return Path.cwd() / "data"   # fallback padrão para exibir mensagem de erro
@@ -789,3 +787,4 @@ st.download_button(
     file_name=f"pbf_{fase.replace(' ', '_')}_{ano_ref}{sufixo_csv}.csv",
     mime="text/csv",
 )
+
