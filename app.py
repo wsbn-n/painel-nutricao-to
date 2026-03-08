@@ -20,7 +20,7 @@ import streamlit as st
 # =============================================================================
 
 st.set_page_config(
-    page_title="Dashboard PBF · Vigilância Nutricional · Tocantins",
+    page_title="Dashboard · Vigilância Alimentar e Nutricional (VAN) · Tocantins",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -496,7 +496,7 @@ st.markdown("---")
 # SÉRIE TEMPORAL
 # =============================================================================
 
-st.markdown(f"<div class='section-header'>📈 Evolução Histórica — {escopo_label}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='section-header'>📈 Série Histórica — {escopo_label}</div>", unsafe_allow_html=True)
 
 serie      = serie_temporal(df_f, fase, use_pbf=use_pbf or False)
 serie_pbf  = serie_temporal(df_f, fase, use_pbf=True)   # sempre calculado para o modo Comparar
@@ -542,7 +542,7 @@ def _add_dual_traces(fig, ind_keys, serie_total, serie_pbf_, shades, comparar_):
 with col1:
     fig_mag = go.Figure(layout=PLOTLY_BASE)
     fig_mag.update_layout(
-        title=dict(text="📉 Magreza / Baixo Peso", font=dict(color="#e2eaf4", size=13)),
+        title=dict(text="📉 Magreza & Baixo Peso", font=dict(color="#e2eaf4", size=13)),
         height=340,
         legend=dict(orientation="h", y=-0.30, font=dict(size=10)) if comparar else dict(),
     )
@@ -787,5 +787,6 @@ st.download_button(
     file_name=f"pbf_{fase.replace(' ', '_')}_{ano_ref}{sufixo_csv}.csv",
     mime="text/csv",
 )
+
 
 
