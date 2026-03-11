@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
+import requests
 import streamlit as st
 
 # =============================================================================
@@ -20,7 +21,7 @@ import streamlit as st
 # =============================================================================
 
 st.set_page_config(
-    page_title="Dashboard · Vigilância Alimentar e Nutricional (VAN) · Tocantins",
+    page_title="Dashboard PBF · Vigilância Nutricional · Tocantins",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -104,12 +105,14 @@ def _encontrar_pasta_data() -> Path:
     Retorna o Path da primeira pasta encontrada que contenha ao menos um xlsx.
     """
     candidatas = [
-        Path.cwd(),                                     # pasta atual (sem subpasta)
+        Path.cwd() / "data",                          # pasta atual/data
+        Path.cwd(),                                    # pasta atual (sem subpasta)
+        Path(__file__).resolve().parent / "data",      # ao lado do app.py/data
         Path(__file__).resolve().parent,               # ao lado do app.py
     ]
     for pasta in candidatas:
         if pasta.exists():
-            xlsx_encontrados = list(pasta.glob("Banco Geral + PBF*.xlsx"))
+            xlsx_encontrados = list(pasta.glob("Banco*PBF*.xlsx"))
             if xlsx_encontrados:
                 return pasta
     return Path.cwd() / "data"   # fallback padrão para exibir mensagem de erro
@@ -280,6 +283,29 @@ MUNICIPIOS  = sorted(DFS["0-5 Anos"]["MUNICIPIO"].unique().tolist())
 ANOS        = sorted(DFS["0-5 Anos"]["Ano"].unique().tolist())
 REGIOES     = sorted(DFS["0-5 Anos"]["REGIÃO DE SAÚDE"].unique().tolist())
 
+
+@st.cache_data(show_spinner="Carregando mapa do Tocantins (IBGE)...")
+def carregar_geojson_tocantins():
+    """
+    Baixa o GeoJSON dos municípios do Tocantins via API do IBGE.
+    IDs ajustados para 6 dígitos (sem dígito verificador) — padrão das planilhas.
+    Retorna None se não houver conexão.
+    """
+    url = (
+        "https://servicodados.ibge.gov.br/api/v3/malhas/estados/17"
+        "?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=municipio"
+    )
+    try:
+        resp = requests.get(url, timeout=20)
+        resp.raise_for_status()
+        geojson = resp.json()
+        for feat in geojson["features"]:
+            cod = str(feat["properties"].get("codarea", ""))
+            feat["id"] = int(cod[:6]) if len(cod) >= 6 else None
+        return geojson
+    except Exception:
+        return None
+
 # =============================================================================
 # FUNÇÕES DE CÁLCULO
 # =============================================================================
@@ -385,6 +411,37 @@ with st.sidebar:
     )
     use_pbf   = pbf_modo == "Somente Beneficiários PBF"
     comparar  = pbf_modo == "Comparar Total vs PBF"
+
+    st.markdown("---")
+
+    # Indicador para o mapa coroplético
+    mapa_key = st.selectbox(
+        "🗺️ Indicador — Mapa Coroplético",
+        list(ind_labels.keys()),
+        format_func=lambda k: ind_labels[k],
+        key="mapa_key_sel",
+    )
+
+    st.markdown("---")
+
+    # Opções do mapa de correlação
+    st.markdown("<small style='color:#7a99b8;font-weight:600'>CORRELAÇÃO</small>", unsafe_allow_html=True)
+    corr_escopo = st.selectbox(
+        "Base de dados",
+        options=[str(a) for a in sorted(ANOS, reverse=True)],
+        help=(
+            "**Ano específico** — somente os 139 municípios do ano selecionado."
+        ),
+    )
+    corr_metodo = st.radio(
+        "Método",
+        options=["Pearson", "Spearman"],
+        horizontal=True,
+        help=(
+            "**Pearson** — correlação linear.\n\n"
+            "**Spearman** — correlação de postos, mais robusta a outliers."
+        ),
+    )
 
     st.markdown("---")
     st.markdown(
@@ -496,7 +553,7 @@ st.markdown("---")
 # SÉRIE TEMPORAL
 # =============================================================================
 
-st.markdown(f"<div class='section-header'>📈 Série Histórica — {escopo_label}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='section-header'>📈 Evolução Histórica — {escopo_label}</div>", unsafe_allow_html=True)
 
 serie      = serie_temporal(df_f, fase, use_pbf=use_pbf or False)
 serie_pbf  = serie_temporal(df_f, fase, use_pbf=True)   # sempre calculado para o modo Comparar
@@ -542,7 +599,7 @@ def _add_dual_traces(fig, ind_keys, serie_total, serie_pbf_, shades, comparar_):
 with col1:
     fig_mag = go.Figure(layout=PLOTLY_BASE)
     fig_mag.update_layout(
-        title=dict(text="📉 Magreza & Baixo Peso", font=dict(color="#e2eaf4", size=13)),
+        title=dict(text="📉 Magreza / Baixo Peso", font=dict(color="#e2eaf4", size=13)),
         height=340,
         legend=dict(orientation="h", y=-0.30, font=dict(size=10)) if comparar else dict(),
     )
@@ -750,6 +807,267 @@ with col_r2:
 st.markdown("---")
 
 # =============================================================================
+# MAPA COROPLÉTICO — TOCANTINS
+# =============================================================================
+
+recorte_mapa = " · PBF" if use_pbf else " · Total"
+st.markdown(
+    f"<div class='section-header'>🗺️ Mapa Coroplético — "
+    f"{inds_fase[mapa_key]['label']}{recorte_mapa} ({ano_ref})</div>",
+    unsafe_allow_html=True,
+)
+
+geojson_to = carregar_geojson_tocantins()
+
+if geojson_to is None:
+    st.warning(
+        "⚠️ Não foi possível carregar o GeoJSON do IBGE. "
+        "Verifique sua conexão com a internet e recarregue a página.",
+        icon="🌐",
+    )
+else:
+    df_mapa_base = df_atual[df_atual["Ano"] == ano_ref].copy()
+    if regiao != "Todas as Regiões":
+        df_mapa_base = df_mapa_base[df_mapa_base["REGIÃO DE SAÚDE"] == regiao]
+
+    total_col_mapa = "TOTAL_PBF" if use_pbf else "TOTAL"
+    mapa_rows = []
+    for mun, grp in df_mapa_base.groupby("MUNICIPIO"):
+        codigo = int(grp["Código IBGE"].iloc[0])
+        val    = calcular_pct(grp, fase, mapa_key, use_pbf)
+        mapa_rows.append({
+            "MUNICIPIO":   mun,
+            "codigo_ibge": codigo,
+            "REGIÃO":      grp["REGIÃO DE SAÚDE"].iloc[0],
+            "Total":       int(grp[total_col_mapa].sum()),
+            "valor":       val,
+        })
+    df_mapa = pd.DataFrame(mapa_rows)
+
+    grupo_mapa = inds_fase[mapa_key]["grupo"]
+    colorscales_mapa = {
+        "eutrofia":  [[0, "#0d2a1a"], [0.5, "#059669"], [1, "#10b981"]],
+        "magreza":   [[0, "#1a0d0d"], [0.5, "#dc2626"], [1, "#f43f5e"]],
+        "sobrepeso": [[0, "#1a1200"], [0.5, "#d97706"], [1, "#f59e0b"]],
+        "estatura":  [[0, "#0d0d2a"], [0.5, "#6366f1"], [1, "#818cf8"]],
+    }
+    colorscale_mapa = colorscales_mapa.get(grupo_mapa, [[0, "#0d1b2e"], [0.5, "#2563eb"], [1, "#3b82f6"]])
+    vmax = float(df_mapa["valor"].quantile(0.95)) if not df_mapa.empty else 100.0
+
+    fig_mapa = go.Figure(go.Choroplethmapbox(
+        geojson=geojson_to,
+        locations=df_mapa["codigo_ibge"],
+        z=df_mapa["valor"],
+        featureidkey="id",
+        colorscale=colorscale_mapa,
+        zmin=0,
+        zmax=vmax,
+        marker_opacity=0.82,
+        marker_line_width=0.6,
+        marker_line_color="#0d1b2e",
+        colorbar=dict(
+            title=dict(text="%", font=dict(color="#7a99b8", size=13)),
+            ticksuffix="%",
+            tickfont=dict(color="#7a99b8", size=11),
+            bgcolor="#111f33",
+            bordercolor="#1e3350",
+            borderwidth=1,
+            len=0.75,
+            thickness=14,
+        ),
+        text=df_mapa["MUNICIPIO"],
+        customdata=df_mapa[["REGIÃO", "Total", "MUNICIPIO"]].values,
+        hovertemplate=(
+            "<b>%{customdata[2]}</b><br>"
+            f"<b>{inds_fase[mapa_key]['label']}:</b> %{{z:.1f}}%<br>"
+            "<b>Região:</b> %{customdata[0]}<br>"
+            "<b>Total avaliados:</b> %{customdata[1]:,}"
+            "<extra></extra>"
+        ),
+    ))
+    fig_mapa.update_layout(
+        mapbox_style="carto-darkmatter",
+        mapbox_zoom=5.6,
+        mapbox_center={"lat": -10.18, "lon": -48.15},
+        height=640,
+        paper_bgcolor="#111f33",
+        margin=dict(t=10, b=10, l=10, r=10),
+    )
+    st.plotly_chart(fig_mapa, use_container_width=True)
+
+    # Legenda de regiões
+    st.markdown(
+        "<div style='display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;margin-bottom:4px'>"
+        + "".join(
+            f"<span style='font-size:0.72rem;font-family:monospace;color:{cor};"
+            f"background:rgba(0,0,0,0.3);border:1px solid {cor}44;"
+            f"padding:2px 10px;border-radius:12px'>⬤ {reg}</span>"
+            for reg, cor in REGIAO_CORES.items()
+        )
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+st.markdown("---")
+
+# =============================================================================
+# CORRELAÇÃO ENTRE INDICADORES
+# =============================================================================
+
+recorte_corr = " · PBF" if use_pbf else " · Total"
+st.markdown(
+    f"<div class='section-header'>🔗 Correlação entre Indicadores — {fase}{recorte_corr}</div>",
+    unsafe_allow_html=True,
+)
+
+# Montar DataFrame de observações (município × ano)
+df_corr_base = df_atual.copy()
+if regiao != "Todas as Regiões":
+    df_corr_base = df_corr_base[df_corr_base["REGIÃO DE SAÚDE"] == regiao]
+if corr_escopo != "Todos os anos":
+    df_corr_base = df_corr_base[df_corr_base["Ano"] == int(corr_escopo)]
+
+obs_rows = []
+for _, grp in df_corr_base.groupby(["MUNICIPIO", "Ano"]):
+    row = {}
+    for k, v in inds_fase.items():
+        row[v["label"]] = calcular_pct(grp, fase, k, use_pbf)
+    obs_rows.append(row)
+
+df_obs = pd.DataFrame(obs_rows).dropna()
+n_obs  = len(df_obs)
+
+if df_obs.shape[0] < 3 or df_obs.shape[1] < 2:
+    st.warning("Dados insuficientes para calcular correlação com os filtros atuais.")
+else:
+    metodo_str  = "pearson" if corr_metodo == "Pearson" else "spearman"
+    corr_matrix = df_obs.corr(method=metodo_str)
+
+    labels    = list(corr_matrix.columns)
+    n         = len(labels)
+    corr_vals = corr_matrix.values
+
+    # Anotações — valor + ícone de sinal dentro de cada célula
+    annotations = []
+    for i in range(n):
+        for j in range(n):
+            val = corr_vals[i, j]
+            if i == j:
+                txt   = "1.00"
+                icone = "◼"
+            elif val > 0:
+                txt   = f"+{val:.2f}"
+                icone = "▲"
+            elif val < 0:
+                txt   = f"{val:.2f}"
+                icone = "▼"
+            else:
+                txt   = "0.00"
+                icone = "○"
+
+            # Texto claro em extremos, mais sutil no centro
+            text_color = "#e2eaf4" if abs(val) > 0.35 else "#7a99b8"
+
+            annotations.append(dict(
+                x=j, y=i,
+                text=f"<b>{txt}</b><br><span style='font-size:9px'>{icone}</span>",
+                showarrow=False,
+                font=dict(color=text_color, size=11, family="IBM Plex Mono, monospace"),
+                xref="x", yref="y",
+            ))
+
+    # Escala divergente: vermelho (-1) → azul-cinza (0) → verde (+1)
+    colorscale_corr = [
+        [0.00, "#7f1d1d"],
+        [0.20, "#dc2626"],
+        [0.35, "#f87171"],
+        [0.50, "#162540"],
+        [0.65, "#34d399"],
+        [0.80, "#059669"],
+        [1.00, "#064e3b"],
+    ]
+
+    # ── Layout sem xaxis/yaxis no dict base para evitar conflito ──────────
+    # PLOTLY_BASE contém xaxis e yaxis; passá-los novamente causaria
+    # "multiple values for keyword argument". Usamos update_xaxes/update_yaxes.
+    PLOTLY_BASE_SEM_EIXOS = {k: v for k, v in PLOTLY_BASE.items()
+                             if k not in ("xaxis", "yaxis", "margin")}
+
+    fig_corr = go.Figure()
+    fig_corr.add_trace(go.Heatmap(
+        z=corr_vals,
+        x=labels,
+        y=labels,
+        zmin=-1, zmax=1, zmid=0,
+        colorscale=colorscale_corr,
+        showscale=True,
+        colorbar=dict(
+            title=dict(text="r", font=dict(color="#7a99b8", size=13)),
+            tickvals=[-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1],
+            ticktext=["-1.00", "-0.75", "-0.50", "-0.25", "0",
+                      "+0.25", "+0.50", "+0.75", "+1.00"],
+            tickfont=dict(color="#7a99b8", size=10),
+            bgcolor="#111f33",
+            bordercolor="#1e3350",
+            borderwidth=1,
+            len=0.9,
+            thickness=14,
+        ),
+        hovertemplate=(
+            "<b>%{y}</b><br>× <b>%{x}</b><br>"
+            "Correlação: <b>%{z:.3f}</b><extra></extra>"
+        ),
+        xgap=2,
+        ygap=2,
+    ))
+
+    altura_corr = max(480, n * 58)
+    fig_corr.update_layout(
+        **PLOTLY_BASE_SEM_EIXOS,
+        height=altura_corr,
+        annotations=annotations,
+        margin=dict(t=30, b=120, l=180, r=100),
+    )
+    # Eixos definidos separadamente — sem conflito com PLOTLY_BASE
+    fig_corr.update_xaxes(
+        tickangle=-35,
+        tickfont=dict(size=10.5, color="#e2eaf4"),
+        showgrid=False,
+        side="bottom",
+        gridcolor="#1e3350",
+        linecolor="#1e3350",
+    )
+    fig_corr.update_yaxes(
+        tickfont=dict(size=10.5, color="#e2eaf4"),
+        showgrid=False,
+        autorange="reversed",
+        gridcolor="#1e3350",
+        linecolor="#1e3350",
+    )
+
+    st.plotly_chart(fig_corr, use_container_width=True)
+
+    # Legenda interpretativa
+    st.markdown(
+        f"""
+        <div style='display:flex;flex-wrap:wrap;gap:16px;margin-top:4px;
+                    font-size:0.72rem;font-family:IBM Plex Mono,monospace;color:#7a99b8'>
+            <span>▲ <b style='color:#34d399'>positiva</b> — indicadores sobem juntos</span>
+            <span>▼ <b style='color:#f87171'>negativa</b> — um sobe quando o outro desce</span>
+            <span>○ <b style='color:#94a3b8'>nula</b> — sem relação linear</span>
+            <span style='margin-left:8px;color:#4a6a88'>
+                Método: {corr_metodo} &nbsp;|&nbsp;
+                n = {n_obs} observações (município × ano) &nbsp;|&nbsp;
+                Recorte: {'PBF' if use_pbf else 'Total'}
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+st.markdown("---")
+
+# =============================================================================
 # TABELA DETALHADA
 # =============================================================================
 
@@ -787,6 +1105,3 @@ st.download_button(
     file_name=f"pbf_{fase.replace(' ', '_')}_{ano_ref}{sufixo_csv}.csv",
     mime="text/csv",
 )
-
-
-
