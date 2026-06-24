@@ -1,6 +1,6 @@
 # =============================================================================
 #  Dashboard Vigilância Nutricional · PBF Tocantins — Streamlit
-#  Programa Bolsa Família · SISVAN · 2015–2024
+#  Programa Bolsa Família · SISVAN · 2019–2025
 # =============================================================================
 #  Instalar:
 #      pip install streamlit plotly pandas openpyxl
@@ -445,7 +445,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        "<small style='color:#4a6a88'>PBF · SISVAN · 2015–2024<br>139 municípios · 8 regiões</small>",
+        "<small style='color:#4a6a88'>PBF · SISVAN · 2019-2025<br>139 municípios · 8 regiões</small>",
         unsafe_allow_html=True,
     )
 
@@ -474,7 +474,7 @@ st.markdown(
             📊 Dashboard Vigilância Nutricional · PBF Tocantins
         </h1>
         <p style='color:#7a99b8;font-size:0.8rem;margin:6px 0 0 0;font-family:monospace'>
-            Programa Bolsa Família · SISVAN · 2015–2024 · 139 municípios · 8 regiões de saúde
+            Programa Bolsa Família · SISVAN · 2019–2025 · 139 municípios · 8 regiões de saúde
         </p>
     </div>
     """,
