@@ -301,7 +301,7 @@ def carregar_geojson_tocantins():
         geojson = resp.json()
         for feat in geojson["features"]:
             cod = str(feat["properties"].get("codarea", ""))
-            feat["id"] = int(cod[:6]) if len(cod) >= 6 else None
+            feat["id"] = int(cod[:7]) if len(cod) >= 7 else None
         return geojson
     except Exception:
         return None
