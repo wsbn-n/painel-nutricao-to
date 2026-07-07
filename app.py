@@ -1,9 +1,9 @@
 # =============================================================================
-#  Dashboard Vigilância Nutricional · PBF Tocantins — Streamlit
+#  Dashboard Vigilância Nutricional · PBF Tocantins — Streamlit (Multi-página)
 #  Programa Bolsa Família · SISVAN · 2019–2025
 # =============================================================================
 #  Instalar:
-#      pip install streamlit plotly pandas openpyxl
+#      pip install streamlit plotly pandas openpyxl requests scipy
 #
 #  Rodar:
 #      streamlit run app.py
@@ -27,7 +27,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# CSS customizado
 st.markdown("""
 <style>
     /* Fundo geral */
@@ -37,7 +36,10 @@ st.markdown("""
     /* Textos */
     html, body, [class*="css"] { color: #e2eaf4; font-family: 'Inter', sans-serif; }
     h1, h2, h3 { color: #e2eaf4 !important; }
-    label, .stSelectbox label, .stMultiSelect label { color: #7a99b8 !important; font-size: 0.75rem !important; text-transform: uppercase; letter-spacing: 0.06em; }
+    label, .stSelectbox label, .stMultiSelect label, .stRadio label {
+        color: #7a99b8 !important; font-size: 0.75rem !important;
+        text-transform: uppercase; letter-spacing: 0.06em;
+    }
 
     /* Cards de métricas */
     [data-testid="metric-container"] {
@@ -49,8 +51,12 @@ st.markdown("""
     [data-testid="stMetricValue"] { color: #00d4aa; font-weight: 800; }
     [data-testid="stMetricLabel"] { color: #7a99b8; font-size: 0.7rem; }
 
-    /* Dropdowns e selects */
-    .stSelectbox > div > div { background-color: #111f33 !important; border: 1px solid #1e3350 !important; color: #e2eaf4 !important; }
+    /* Dropdowns */
+    .stSelectbox > div > div {
+        background-color: #111f33 !important;
+        border: 1px solid #1e3350 !important;
+        color: #e2eaf4 !important;
+    }
 
     /* Dividers */
     hr { border-color: #1e3350; }
@@ -58,9 +64,6 @@ st.markdown("""
     /* Tabela */
     .dataframe { background-color: #111f33 !important; color: #e2eaf4 !important; }
     thead tr th { background-color: #162540 !important; color: #7a99b8 !important; font-size: 0.72rem !important; }
-
-    /* Sidebar labels */
-    .sidebar-section { color: #00d4aa; font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; display: block; }
 
     /* Info box */
     .info-box {
@@ -84,6 +87,33 @@ st.markdown("""
         border-bottom: 1px solid #1e3350;
         margin-bottom: 16px;
     }
+
+    /* Navegação — rótulo do grupo */
+    .nav-label {
+        color: #4a6a88;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.10em;
+        font-weight: 700;
+        margin: 6px 0 4px 4px;
+    }
+
+    /* Botão de navegação ativo */
+    div[data-testid="stButton"] button[kind="primary"] {
+        background-color: #00d4aa22 !important;
+        border: 1px solid #00d4aa !important;
+        color: #00d4aa !important;
+        font-weight: 700;
+    }
+    div[data-testid="stButton"] button[kind="secondary"] {
+        background-color: transparent !important;
+        border: 1px solid #1e3350 !important;
+        color: #7a99b8 !important;
+    }
+    div[data-testid="stButton"] button[kind="secondary"]:hover {
+        border-color: #00d4aa88 !important;
+        color: #e2eaf4 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -100,72 +130,40 @@ NOMES_ARQUIVOS = {
 }
 
 def _encontrar_pasta_data() -> Path:
-    """
-    Tenta localizar a pasta 'data/' em vários lugares comuns.
-    Retorna o Path da primeira pasta encontrada que contenha ao menos um xlsx.
-    """
     candidatas = [
-        Path.cwd() / "data",                          # pasta atual/data
-        Path.cwd(),                                    # pasta atual (sem subpasta)
-        Path(__file__).resolve().parent / "data",      # ao lado do app.py/data
-        Path(__file__).resolve().parent,               # ao lado do app.py
+        Path.cwd() / "data",
+        Path.cwd(),
+        Path(__file__).resolve().parent / "data",
+        Path(__file__).resolve().parent,
     ]
     for pasta in candidatas:
-        if pasta.exists():
-            xlsx_encontrados = list(pasta.glob("Banco*PBF*.xlsx"))
-            if xlsx_encontrados:
-                return pasta
-    return Path.cwd() / "data"   # fallback padrão para exibir mensagem de erro
+        if pasta.exists() and list(pasta.glob("Banco*PBF*.xlsx")):
+            return pasta
+    return Path.cwd() / "data"
 
 _pasta_data = _encontrar_pasta_data()
-ARQUIVOS = {fase: _pasta_data / nome for fase, nome in NOMES_ARQUIVOS.items()}
+ARQUIVOS    = {fase: _pasta_data / nome for fase, nome in NOMES_ARQUIVOS.items()}
 
-# Verificar se os arquivos existem; mostrar erro amigável se não
 _faltando = [str(p) for p in ARQUIVOS.values() if not p.exists()]
 if _faltando:
-    st.set_page_config(page_title="Erro — Dashboard PBF", page_icon="❌", layout="wide")
-    st.error("### ❌ Arquivos não encontrados")
-    st.markdown(
-        f"""
-        O dashboard não conseguiu encontrar as planilhas. Verifique se elas estão
-        em uma das localizações abaixo:
-
-        **Opção 1 — subpasta `data/` ao lado do `app.py`** *(recomendado)*
-        ```
-        seu-projeto/
-        ├── app.py
-        └── data/
-            ├── Banco_Geral___PBF_0-5_Anos.xlsx
-            ├── Banco_Geral___PBF_5-10_Anos.xlsx
-            ├── Banco_Geral___PBF_Adolescentes.xlsx
-            ├── Banco_Geral___PBF_Adultos.xlsx
-            └── Banco_Geral___PBF_Idosos.xlsx
-        ```
-
-        **Opção 2 — mesma pasta que o `app.py`**
-        ```
-        seu-projeto/
-        ├── app.py
-        ├── Banco_Geral___PBF_0-5_Anos.xlsx
-        ├── Banco_Geral___PBF_5-10_Anos.xlsx
-        ├── ...
-        ```
-
-        **Pasta onde o dashboard procurou:** `{_pasta_data}`
-
-        **Arquivos não encontrados:**
-        """
-    )
+    st.error("### ❌ Arquivos de dados não encontrados")
+    st.markdown(f"""
+Verifique se as planilhas estão em uma subpasta `data/` ao lado do `app.py`:
+```
+seu-projeto/
+├── app.py
+└── data/
+    ├── Banco Geral + PBF 0-5 Anos.xlsx
+    ├── ...
+```
+**Pasta onde o dashboard procurou:** `{_pasta_data}`
+""")
     for p in _faltando:
         st.code(p)
-    st.info(
-        "💡 **Dica:** Rode o Streamlit **dentro da pasta do projeto**:\n"
-        "```\ncd seu-projeto\nstreamlit run app.py\n```"
-    )
     st.stop()
 
 # =============================================================================
-# DICIONÁRIO DE INDICADORES POR FASE DA VIDA
+# DICIONÁRIO DE INDICADORES
 # =============================================================================
 
 INDICADORES = {
@@ -211,12 +209,12 @@ INDICADORES = {
         "obesidade_grave":        {"cols_n": ["OG"],   "cols_pct": ["OG2"],   "label": "Obesidade Grave",            "grupo": "sobrepeso"},
     },
     "Adultos": {
-        "baixo_peso": {"cols_n": ["BP"],    "cols_pct": ["BP%"],   "label": "Baixo Peso",         "grupo": "magreza"},
-        "eutrofia":   {"cols_n": ["E"],     "cols_pct": ["E%"],    "label": "Eutrofia",            "grupo": "eutrofia"},
-        "sobrepeso":  {"cols_n": ["S"],     "cols_pct": ["S%"],    "label": "Sobrepeso",           "grupo": "sobrepeso"},
-        "obesidade_g1": {"cols_n": ["OGI"], "cols_pct": ["OGI%"], "label": "Obesidade Grau I",    "grupo": "sobrepeso"},
-        "obesidade_g2": {"cols_n": ["OGII"],"cols_pct": ["OGII%"],"label": "Obesidade Grau II",   "grupo": "sobrepeso"},
-        "obesidade_g3": {"cols_n": ["OGIII"],"cols_pct":["OGIII%"],"label": "Obesidade Grau III", "grupo": "sobrepeso"},
+        "baixo_peso":   {"cols_n": ["BP"],    "cols_pct": ["BP%"],    "label": "Baixo Peso",         "grupo": "magreza"},
+        "eutrofia":     {"cols_n": ["E"],     "cols_pct": ["E%"],     "label": "Eutrofia",            "grupo": "eutrofia"},
+        "sobrepeso":    {"cols_n": ["S"],     "cols_pct": ["S%"],     "label": "Sobrepeso",           "grupo": "sobrepeso"},
+        "obesidade_g1": {"cols_n": ["OGI"],  "cols_pct": ["OGI%"],  "label": "Obesidade Grau I",    "grupo": "sobrepeso"},
+        "obesidade_g2": {"cols_n": ["OGII"], "cols_pct": ["OGII%"], "label": "Obesidade Grau II",   "grupo": "sobrepeso"},
+        "obesidade_g3": {"cols_n": ["OGIII"],"cols_pct": ["OGIII%"],"label": "Obesidade Grau III",  "grupo": "sobrepeso"},
     },
     "Idosos": {
         "baixo_peso": {"cols_n": ["BP"], "cols_pct": ["BP%"], "label": "Baixo Peso", "grupo": "magreza"},
@@ -262,34 +260,45 @@ PLOTLY_BASE = dict(
     hoverlabel=dict(bgcolor="#162540", font_color="#e2eaf4", bordercolor="#1e3350"),
 )
 
+PALETA = ["#10b981","#f43f5e","#f59e0b","#ef4444","#818cf8",
+          "#0891b2","#db2777","#65a30d","#d97706","#a855f7","#059669","#dc2626"]
+
 # =============================================================================
-# CARREGAMENTO DOS DADOS (com cache)
+# PÁGINAS — definição
+# =============================================================================
+
+PAGINAS = {
+    "visao_geral":    ("🏠", "Visão Geral"),
+    "serie_temporal": ("📈", "Série Temporal"),
+    "heatmap":        ("🌡", "Heatmap Municipal"),
+    "mapa":           ("🗺️", "Mapa Coroplético"),
+    "rankings":       ("🏆", "Rankings"),
+    "correlacao":     ("🔗", "Correlações"),
+    "tabela":         ("📋", "Tabela de Dados"),
+}
+
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = "visao_geral"
+
+# =============================================================================
+# CARREGAMENTO DOS DADOS
 # =============================================================================
 
 @st.cache_data(show_spinner="Carregando planilhas...")
 def carregar_dados():
     dfs = {}
     for fase, path in ARQUIVOS.items():
-        df = pd.read_excel(path)
-        df = df.fillna(0)
+        df = pd.read_excel(path).fillna(0)
         df["REGIÃO DE SAÚDE"] = df["REGIÃO DE SAÚDE"].astype(str).str.strip()
-        df["MUNICIPIO"] = df["MUNICIPIO"].astype(str).str.strip()
+        df["MUNICIPIO"]       = df["MUNICIPIO"].astype(str).str.strip()
         dfs[fase] = df
     return dfs
 
-DFS = carregar_dados()
-
-MUNICIPIOS  = sorted(DFS["0-5 Anos"]["MUNICIPIO"].unique().tolist())
-ANOS        = sorted(DFS["0-5 Anos"]["Ano"].unique().tolist())
-REGIOES     = sorted(DFS["0-5 Anos"]["REGIÃO DE SAÚDE"].unique().tolist())
-
-
-@st.cache_data(show_spinner="Carregando mapa do Tocantins (IBGE)...")
+@st.cache_data(show_spinner="Carregando mapa do IBGE...")
 def carregar_geojson_tocantins():
     """
     Baixa o GeoJSON dos municípios do Tocantins via API do IBGE.
-    IDs ajustados para 6 dígitos (sem dígito verificador) — padrão das planilhas.
-    Retorna None se não houver conexão.
+    Mantém o código de 7 dígitos completo para coincidir com a planilha.
     """
     url = (
         "https://servicodados.ibge.gov.br/api/v3/malhas/estados/17"
@@ -300,22 +309,23 @@ def carregar_geojson_tocantins():
         resp.raise_for_status()
         geojson = resp.json()
         for feat in geojson["features"]:
-            cod = str(feat["properties"].get("codarea", ""))
-            feat["id"] = int(cod[:7]) if len(cod) >= 7 else None
+            cod = str(feat["properties"].get("codarea", "")).strip()
+            # ── CORREÇÃO: usa os 7 dígitos completos ──
+            feat["id"] = int(cod) if cod.isdigit() else None
         return geojson
     except Exception:
         return None
+
+DFS       = carregar_dados()
+MUNICIPIOS = sorted(DFS["0-5 Anos"]["MUNICIPIO"].unique().tolist())
+ANOS       = sorted(DFS["0-5 Anos"]["Ano"].unique().tolist())
+REGIOES    = sorted(DFS["0-5 Anos"]["REGIÃO DE SAÚDE"].unique().tolist())
 
 # =============================================================================
 # FUNÇÕES DE CÁLCULO
 # =============================================================================
 
 def calcular_pct(df, fase, indicador, use_pbf=False):
-    """
-    Calcula o percentual de um indicador no DataFrame recebido.
-      use_pbf=False  -> colunas originais + TOTAL       (todos os avaliados)
-      use_pbf=True   -> colunas _PBF      + TOTAL_PBF   (somente beneficiários PBF)
-    """
     ind = INDICADORES[fase][indicador]
     if use_pbf:
         cols  = [c + "_PBF" for c in ind["cols_n"] if c + "_PBF" in df.columns]
@@ -327,9 +337,7 @@ def calcular_pct(df, fase, indicador, use_pbf=False):
         return 0.0
     return round(float(sum(df[c].sum() for c in cols) / total) * 100, 2)
 
-
 def serie_temporal(df_fase, fase, use_pbf=False):
-    """Retorna DataFrame com percentuais por ano para todos os indicadores."""
     total_col = "TOTAL_PBF" if use_pbf else "TOTAL"
     rows = []
     for ano in ANOS:
@@ -340,9 +348,7 @@ def serie_temporal(df_fase, fase, use_pbf=False):
         rows.append(row)
     return pd.DataFrame(rows)
 
-
 def tabela_municipios(df_fase, fase, ano, use_pbf=False):
-    """Retorna DataFrame por município para o ano selecionado."""
     total_col = "TOTAL_PBF" if use_pbf else "TOTAL"
     df_a  = df_fase[df_fase["Ano"] == ano]
     rows  = []
@@ -357,511 +363,300 @@ def tabela_municipios(df_fase, fase, ano, use_pbf=False):
         rows.append(row)
     return pd.DataFrame(rows)
 
-# =============================================================================
-# SIDEBAR — FILTROS
-# =============================================================================
-
-with st.sidebar:
-    st.markdown("## 📊 Filtros")
-    st.markdown("---")
-
-    fase = st.selectbox("🧒 Fase da Vida", list(ARQUIVOS.keys()))
-
-    st.markdown("---")
-
-    regiao_opcoes = ["Todas as Regiões"] + REGIOES
-    regiao = st.selectbox("🗺 Região de Saúde", regiao_opcoes)
-
-    # Municípios filtrados pela região
-    df_atual = DFS[fase]
-    if regiao != "Todas as Regiões":
-        muns_disp = sorted(df_atual[df_atual["REGIÃO DE SAÚDE"] == regiao]["MUNICIPIO"].unique().tolist())
-    else:
-        muns_disp = MUNICIPIOS
-
-    municipio_opcoes = ["Todo o Estado (Tocantins)"] + muns_disp
-    municipio = st.selectbox("🏙 Município", municipio_opcoes)
-
-    st.markdown("---")
-
-    ano_ref = st.selectbox("📅 Ano de Referência (KPIs)", list(reversed(ANOS)))
-
-    st.markdown("---")
-
-    # Indicador para o heatmap
-    inds_fase = INDICADORES[fase]
-    ind_labels = {k: v["label"] for k, v in inds_fase.items()}
-    hm_key = st.selectbox(
-        "🌡 Indicador — Heatmap",
-        list(ind_labels.keys()),
-        format_func=lambda k: ind_labels[k],
-    )
-
-    st.markdown("---")
-
-    pbf_modo = st.radio(
-        "👁 Recorte populacional",
-        options=["Total (todos avaliados)", "Somente Beneficiários PBF", "Comparar Total vs PBF"],
-        index=0,
-        help=(
-            "**Total** — considera todos os indivíduos avaliados.\n\n"
-            "**Somente PBF** — considera apenas os beneficiários do Programa Bolsa Família.\n\n"
-            "**Comparar** — exibe ambas as séries sobrepostas nos gráficos e lado a lado nos KPIs."
-        ),
-    )
-    use_pbf   = pbf_modo == "Somente Beneficiários PBF"
-    comparar  = pbf_modo == "Comparar Total vs PBF"
-
-    st.markdown("---")
-
-    # Indicador para o mapa coroplético
-    mapa_key = st.selectbox(
-        "🗺️ Indicador — Mapa Coroplético",
-        list(ind_labels.keys()),
-        format_func=lambda k: ind_labels[k],
-        key="mapa_key_sel",
-    )
-
-    st.markdown("---")
-
-    # Opções do mapa de correlação
-    st.markdown("<small style='color:#7a99b8;font-weight:600'>CORRELAÇÃO</small>", unsafe_allow_html=True)
-    corr_escopo = st.selectbox(
-        "Base de dados",
-        options=[str(a) for a in sorted(ANOS, reverse=True)],
-        help=(
-            "**Ano específico** — somente os 139 municípios do ano selecionado."
-        ),
-    )
-    corr_metodo = st.radio(
-        "Método",
-        options=["Pearson", "Spearman"],
-        horizontal=True,
-        help=(
-            "**Pearson** — correlação linear.\n\n"
-            "**Spearman** — correlação de postos, mais robusta a outliers."
-        ),
-    )
-
-    st.markdown("---")
-    st.markdown(
-        "<small style='color:#4a6a88'>PBF · SISVAN · 2019-2025<br>139 municípios · 8 regiões</small>",
-        unsafe_allow_html=True,
-    )
-
-# =============================================================================
-# FILTRAR DATAFRAME CONFORME SELEÇÃO
-# =============================================================================
-
-df_f = df_atual.copy()
-if regiao != "Todas as Regiões":
-    df_f = df_f[df_f["REGIÃO DE SAÚDE"] == regiao]
-if municipio != "Todo o Estado (Tocantins)":
-    df_f = df_f[df_f["MUNICIPIO"] == municipio]
-
-escopo_label = municipio if municipio != "Todo o Estado (Tocantins)" else (
-    regiao if regiao != "Todas as Regiões" else "Tocantins (Estado)"
-)
-
-# =============================================================================
-# CABEÇALHO
-# =============================================================================
-
-st.markdown(
-    f"""
-    <div style='padding:4px 0 18px 0'>
-        <h1 style='margin:0;font-size:1.6rem;color:#00d4aa;font-weight:800'>
-            📊 Dashboard Vigilância Nutricional · PBF Tocantins
-        </h1>
-        <p style='color:#7a99b8;font-size:0.8rem;margin:6px 0 0 0;font-family:monospace'>
-            Programa Bolsa Família · SISVAN · 2019–2025 · 139 municípios · 8 regiões de saúde
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Info da fase
-st.markdown(
-    f"<div class='info-box'><strong>Fase: {fase}</strong> — {FASE_DESCRICAO[fase]}</div>",
-    unsafe_allow_html=True,
-)
-
-# =============================================================================
-# KPIs
-# =============================================================================
-
-st.markdown("<div class='section-header'>📌 Indicadores — " + str(ano_ref) + "</div>", unsafe_allow_html=True)
-
-df_ano = df_f[df_f["Ano"] == ano_ref]
-total_col_kpi = "TOTAL_PBF" if use_pbf else "TOTAL"
-total_ano     = int(df_ano[total_col_kpi].sum())
-total_ano_pbf = int(df_ano["TOTAL_PBF"].sum())
-total_ano_all = int(df_ano["TOTAL"].sum())
-
-kpi_keys = list(inds_fase.keys())
-
-# ── Linha de totais ────────────────────────────────────────────────────────
-cols_kpi0 = st.columns(3 if comparar else 2)
-with cols_kpi0[0]:
-    st.metric("👥 Total Avaliados (Geral)", f"{total_ano_all:,}".replace(",", "."))
-with cols_kpi0[1]:
-    st.metric("🎯 Total Avaliados (PBF)", f"{total_ano_pbf:,}".replace(",", "."))
-if comparar:
-    with cols_kpi0[2]:
-        cobertura = round(total_ano_pbf / total_ano_all * 100, 1) if total_ano_all > 0 else 0
-        st.metric("📊 Cobertura PBF", f"{cobertura:.1f}%", help="% dos avaliados que são beneficiários PBF")
-
-st.markdown("")
-
-# ── Linhas de indicadores ──────────────────────────────────────────────────
-# Em modo Comparar exibimos Total | PBF | Δ para cada indicador
-if comparar:
-    for k in kpi_keys:
-        val_total = calcular_pct(df_ano, fase, k, use_pbf=False)
-        val_pbf   = calcular_pct(df_ano, fase, k, use_pbf=True)
-        delta     = round(val_pbf - val_total, 1)
-        label     = inds_fase[k]["label"]
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric(f"📊 {label} · Total",  f"{val_total:.1f}%")
-        with c2:
-            st.metric(f"🎯 {label} · PBF",    f"{val_pbf:.1f}%")
-        with c3:
-            sinal = "▲" if delta > 0 else ("▼" if delta < 0 else "=")
-            cor   = "🔴" if delta > 0.5 else ("🟢" if delta < -0.5 else "🟡")
-            st.metric(f"{cor} Diferença (PBF − Total)", f"{delta:+.1f} p.p.")
-else:
-    # Linha 1: primeiros 4
-    cols_kpi1 = st.columns(min(len(kpi_keys), 4))
-    for i, k in enumerate(kpi_keys[:4]):
-        val = calcular_pct(df_ano, fase, k, use_pbf)
-        with cols_kpi1[i]:
-            st.metric(inds_fase[k]["label"], f"{val:.1f}%")
-    # Linha 2: restantes
-    if len(kpi_keys) > 4:
-        restantes = kpi_keys[4:]
-        cols_kpi2 = st.columns(min(len(restantes), 4))
-        for i, k in enumerate(restantes[:4]):
-            val = calcular_pct(df_ano, fase, k, use_pbf)
-            with cols_kpi2[i]:
-                st.metric(inds_fase[k]["label"], f"{val:.1f}%")
-
-st.markdown("---")
-
-# =============================================================================
-# SÉRIE TEMPORAL
-# =============================================================================
-
-st.markdown(f"<div class='section-header'>📈 Evolução Histórica — {escopo_label}</div>", unsafe_allow_html=True)
-
-serie      = serie_temporal(df_f, fase, use_pbf=use_pbf or False)
-serie_pbf  = serie_temporal(df_f, fase, use_pbf=True)   # sempre calculado para o modo Comparar
-serie_all  = serie_temporal(df_f, fase, use_pbf=False)
-
-col1, col2 = st.columns(2)
-
-def _add_dual_traces(fig, ind_keys, serie_total, serie_pbf_, shades, comparar_):
-    """Adiciona traces ao gráfico: se comparar_, linha Total + linha PBF; senão só série ativa."""
+def _add_dual_traces(fig, fase, ind_keys, serie_total, serie_pbf, serie_ativa,
+                     shades, comparar):
     for i, k in enumerate(ind_keys):
         cor = shades[i % len(shades)]
-        if comparar_:
-            # Linha Total — sólida
+        lbl = INDICADORES[fase][k]["label"]
+        if comparar:
             fig.add_trace(go.Scatter(
                 x=serie_total["Ano"], y=serie_total[k],
-                name=f"{INDICADORES[fase][k]['label']} · Total",
+                name=f"{lbl} · Total",
                 mode="lines+markers",
                 line=dict(width=2.5, color=cor),
                 marker=dict(size=5),
                 legendgroup=k,
             ))
-            # Linha PBF — tracejada, mesma cor mais clara
             fig.add_trace(go.Scatter(
-                x=serie_pbf_["Ano"], y=serie_pbf_[k],
-                name=f"{INDICADORES[fase][k]['label']} · PBF",
+                x=serie_pbf["Ano"], y=serie_pbf[k],
+                name=f"{lbl} · PBF",
                 mode="lines+markers",
                 line=dict(width=2, color=cor, dash="dot"),
                 marker=dict(size=4, symbol="diamond"),
                 legendgroup=k,
             ))
         else:
+            r, g, b = int(cor[1:3], 16), int(cor[3:5], 16), int(cor[5:7], 16)
             fig.add_trace(go.Scatter(
-                x=serie["Ano"], y=serie[k],
-                name=INDICADORES[fase][k]["label"],
+                x=serie_ativa["Ano"], y=serie_ativa[k],
+                name=lbl,
                 mode="lines+markers",
                 line=dict(width=2.5, color=cor),
                 marker=dict(size=5),
                 fill="tozeroy" if i == 0 else "none",
-                fillcolor=f"rgba({int(cor[1:3],16)},{int(cor[3:5],16)},{int(cor[5:7],16)},0.10)" if i == 0 else "rgba(0,0,0,0)",
+                fillcolor=f"rgba({r},{g},{b},0.10)" if i == 0 else "rgba(0,0,0,0)",
             ))
 
-# ── Magreza ────────────────────────────────────────────────────────────────
-with col1:
-    fig_mag = go.Figure(layout=PLOTLY_BASE)
-    fig_mag.update_layout(
-        title=dict(text="📉 Magreza / Baixo Peso", font=dict(color="#e2eaf4", size=13)),
-        height=340,
-        legend=dict(orientation="h", y=-0.30, font=dict(size=10)) if comparar else dict(),
-    )
-    inds_mag = [k for k, v in inds_fase.items() if v["grupo"] == "magreza"]
-    shades_m = ["#f43f5e", "#fb7185", "#fda4af", "#fecdd3"]
-    _add_dual_traces(fig_mag, inds_mag, serie_all, serie_pbf, shades_m, comparar)
-    fig_mag.update_yaxes(ticksuffix="%")
-    st.plotly_chart(fig_mag, use_container_width=True)
+# =============================================================================
+# CABEÇALHO PADRÃO
+# =============================================================================
 
-# ── Sobrepeso ───────────────────────────────────────────────────────────────
-with col2:
-    fig_sob = go.Figure(layout=PLOTLY_BASE)
-    fig_sob.update_layout(
-        title=dict(text="📈 Sobrepeso & Obesidade", font=dict(color="#e2eaf4", size=13)),
-        height=340,
-        legend=dict(orientation="h", y=-0.30, font=dict(size=10)) if comparar else dict(),
+def _cabecalho(fase, pagina_label):
+    st.markdown(f"""
+    <div style='padding:4px 0 12px 0'>
+        <h1 style='margin:0;font-size:1.5rem;color:#00d4aa;font-weight:800'>
+            📊 Dashboard Vigilância Nutricional · PBF Tocantins
+        </h1>
+        <p style='color:#7a99b8;font-size:0.78rem;margin:4px 0 0 0;font-family:monospace'>
+            Programa Bolsa Família · SISVAN · 2019–2025 · 139 municípios · 8 regiões &nbsp;·&nbsp;
+            <span style='color:#00d4aa'>{pagina_label}</span>
+        </p>
+    </div>""", unsafe_allow_html=True)
+    st.markdown(
+        f"<div class='info-box'><strong>Fase: {fase}</strong> — {FASE_DESCRICAO[fase]}</div>",
+        unsafe_allow_html=True,
     )
-    inds_sob = [k for k, v in inds_fase.items() if v["grupo"] == "sobrepeso"]
-    shades_s = ["#f59e0b", "#ef4444", "#dc2626", "#a855f7", "#7c3aed"]
-    _add_dual_traces(fig_sob, inds_sob, serie_all, serie_pbf, shades_s, comparar)
-    fig_sob.update_yaxes(ticksuffix="%")
-    st.plotly_chart(fig_sob, use_container_width=True)
 
-# ── Distribuição completa ────────────────────────────────────────────────────
-fig_dist = go.Figure(layout=PLOTLY_BASE)
-subtitulo_dist = " · Somente PBF" if use_pbf else (" · Total vs PBF" if comparar else " · Total")
-fig_dist.update_layout(
-    title=dict(text=f"📊 Distribuição Nutricional Completa{subtitulo_dist}",
-               font=dict(color="#e2eaf4", size=13)),
-    barmode="group",
-    height=400,
-    legend=dict(orientation="h", y=-0.28, font=dict(size=10)),
-    margin=dict(t=50, b=90, l=60, r=20),
-)
-paleta = ["#10b981","#f43f5e","#f59e0b","#ef4444","#818cf8",
-          "#0891b2","#db2777","#65a30d","#d97706","#a855f7","#059669","#dc2626"]
-for i, (k, v) in enumerate(inds_fase.items()):
-    cor = paleta[i % len(paleta)]
+# =============================================================================
+# PÁGINA 1 — VISÃO GERAL (KPIs)
+# =============================================================================
+
+def pagina_visao_geral(fase, df_f, inds_fase, ano_ref, use_pbf, comparar, escopo_label):
+    _cabecalho(fase, "🏠 Visão Geral")
+    st.markdown(f"<div class='section-header'>📌 Indicadores — {ano_ref} · {escopo_label}</div>",
+                unsafe_allow_html=True)
+
+    df_ano        = df_f[df_f["Ano"] == ano_ref]
+    total_ano_all = int(df_ano["TOTAL"].sum())
+    total_ano_pbf = int(df_ano["TOTAL_PBF"].sum())
+    kpi_keys      = list(inds_fase.keys())
+
+    cols0 = st.columns(3 if comparar else 2)
+    with cols0[0]:
+        st.metric("👥 Total Avaliados (Geral)", f"{total_ano_all:,}".replace(",", "."))
+    with cols0[1]:
+        st.metric("🎯 Total Avaliados (PBF)", f"{total_ano_pbf:,}".replace(",", "."))
     if comparar:
-        fig_dist.add_trace(go.Bar(
-            x=serie_all["Ano"], y=serie_all[k],
-            name=f"{v['label']} · Total",
-            marker_color=cor,
-            marker_line_color=cor, marker_line_width=1,
-            legendgroup=k,
-        ))
-        fig_dist.add_trace(go.Bar(
-            x=serie_pbf["Ano"], y=serie_pbf[k],
-            name=f"{v['label']} · PBF",
-            marker_color=cor,
-            marker_line_color=cor, marker_line_width=1,
-            legendgroup=k,
-        ))
+        with cols0[2]:
+            cob = round(total_ano_pbf / total_ano_all * 100, 1) if total_ano_all else 0
+            st.metric("📊 Cobertura PBF", f"{cob:.1f}%")
+
+    st.markdown("")
+
+    if comparar:
+        for k in kpi_keys:
+            vt  = calcular_pct(df_ano, fase, k, False)
+            vp  = calcular_pct(df_ano, fase, k, True)
+            dlt = round(vp - vt, 1)
+            lbl = inds_fase[k]["label"]
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.metric(f"📊 {lbl} · Total", f"{vt:.1f}%")
+            with c2:
+                st.metric(f"🎯 {lbl} · PBF",   f"{vp:.1f}%")
+            with c3:
+                cor = "🔴" if dlt > 0.5 else ("🟢" if dlt < -0.5 else "🟡")
+                st.metric(f"{cor} Diferença (PBF − Total)", f"{dlt:+.1f} p.p.")
     else:
-        fig_dist.add_trace(go.Bar(
-            x=serie["Ano"], y=serie[k],
-            name=v["label"],
-            marker_color=cor,
-        ))
-fig_dist.update_yaxes(ticksuffix="%")
-st.plotly_chart(fig_dist, use_container_width=True)
-
-st.markdown("---")
-
-# =============================================================================
-# HEATMAP POR MUNICÍPIO
-# =============================================================================
-
-recorte_hm = " · PBF" if use_pbf else (" · Total" if not comparar else " · Total")
-st.markdown(f"<div class='section-header'>🌡 Heatmap por Município — {inds_fase[hm_key]['label']}{recorte_hm} ({ano_ref})</div>",
-            unsafe_allow_html=True)
-
-df_hm_base = df_atual.copy()
-if regiao != "Todas as Regiões":
-    df_hm_base = df_hm_base[df_hm_base["REGIÃO DE SAÚDE"] == regiao]
-df_hm_ano = df_hm_base[df_hm_base["Ano"] == ano_ref]
-
-total_col_hm = "TOTAL_PBF" if use_pbf else "TOTAL"
-hm_rows = []
-for mun, grp in df_hm_ano.groupby("MUNICIPIO"):
-    hm_rows.append({
-        "MUNICIPIO": mun,
-        "REGIÃO":    grp["REGIÃO DE SAÚDE"].iloc[0],
-        "Total":     int(grp[total_col_hm].sum()),
-        hm_key:      calcular_pct(grp, fase, hm_key, use_pbf),
-    })
-df_hm = pd.DataFrame(hm_rows).sort_values(hm_key, ascending=True)
-
-grupo_hm = inds_fase[hm_key]["grupo"]
-if grupo_hm == "eutrofia":
-    colorscale = [[0, "#1e3350"], [0.5, "#059669"], [1, "#10b981"]]
-elif grupo_hm == "magreza":
-    colorscale = [[0, "#1e3350"], [0.5, "#f87171"], [1, "#f43f5e"]]
-elif grupo_hm == "sobrepeso":
-    colorscale = [[0, "#1e3350"], [0.5, "#fbbf24"], [1, "#f59e0b"]]
-else:
-    colorscale = [[0, "#1e3350"], [0.5, "#818cf8"], [1, "#6366f1"]]
-
-fig_hm = go.Figure(layout=PLOTLY_BASE)
-fig_hm.update_layout(
-    height=max(500, len(df_hm) * 19),
-    margin=dict(t=30, b=20, l=170, r=110),
-    yaxis=dict(tickfont=dict(size=9.5)),
-)
-fig_hm.add_trace(go.Bar(
-    x=df_hm[hm_key],
-    y=df_hm["MUNICIPIO"],
-    orientation="h",
-    marker=dict(
-        color=df_hm[hm_key],
-        colorscale=colorscale,
-        showscale=True,
-        colorbar=dict(
-            title="%", ticksuffix="%",
-            tickfont=dict(color="#7a99b8"),
-            title_font=dict(color="#7a99b8"),
-            bgcolor="#111f33",
-            bordercolor="#1e3350",
-        ),
-    ),
-    customdata=df_hm[["REGIÃO", "Total"]].values,
-    hovertemplate=(
-        "<b>%{y}</b><br>"
-        f"{inds_fase[hm_key]['label']}: %{{x:.1f}}%<br>"
-        "Região: %{customdata[0]}<br>"
-        "Total: %{customdata[1]:,}<extra></extra>"
-    ),
-))
-fig_hm.update_xaxes(ticksuffix="%")
-st.plotly_chart(fig_hm, use_container_width=True)
-
-st.markdown("---")
+        cols1 = st.columns(min(len(kpi_keys), 4))
+        for i, k in enumerate(kpi_keys[:4]):
+            with cols1[i]:
+                st.metric(inds_fase[k]["label"],
+                          f"{calcular_pct(df_ano, fase, k, use_pbf):.1f}%")
+        if len(kpi_keys) > 4:
+            restantes = kpi_keys[4:]
+            cols2 = st.columns(min(len(restantes), 4))
+            for i, k in enumerate(restantes[:4]):
+                with cols2[i]:
+                    st.metric(inds_fase[k]["label"],
+                              f"{calcular_pct(df_ano, fase, k, use_pbf):.1f}%")
 
 # =============================================================================
-# RANKINGS
+# PÁGINA 2 — SÉRIE TEMPORAL
 # =============================================================================
 
-st.markdown(f"<div class='section-header'>🏆 Ranking de Municípios ({max(ANOS)})</div>", unsafe_allow_html=True)
+def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label):
+    _cabecalho(fase, "📈 Série Temporal")
+    subtit = " · Somente PBF" if use_pbf else (" · Total vs PBF" if comparar else " · Total")
+    st.markdown(f"<div class='section-header'>📈 Evolução Histórica — {escopo_label}{subtit}</div>",
+                unsafe_allow_html=True)
 
-df_rank_base = df_atual[df_atual["Ano"] == max(ANOS)].copy()
-if regiao != "Todas as Regiões":
-    df_rank_base = df_rank_base[df_rank_base["REGIÃO DE SAÚDE"] == regiao]
+    serie_ativa = serie_temporal(df_f, fase, use_pbf=use_pbf)
+    serie_all   = serie_temporal(df_f, fase, use_pbf=False)
+    serie_pbf   = serie_temporal(df_f, fase, use_pbf=True)
 
-total_col_rank = "TOTAL_PBF" if use_pbf else "TOTAL"
-rank_rows = []
-for mun, grp in df_rank_base.groupby("MUNICIPIO"):
-    row = {"MUNICIPIO": mun, "REGIÃO": grp["REGIÃO DE SAÚDE"].iloc[0],
-           "Total": int(grp[total_col_rank].sum())}
-    for k in inds_fase:
-        row[k] = calcular_pct(grp, fase, k, use_pbf)
-    rank_rows.append(row)
-df_rank = pd.DataFrame(rank_rows)
+    col1, col2 = st.columns(2)
 
-col_r1, col_r2 = st.columns(2)
-
-# Primeiro indicador de magreza
-ind_mag_key = next((k for k, v in inds_fase.items() if v["grupo"] == "magreza"), None)
-# Primeiro indicador de sobrepeso
-ind_sob_key = next((k for k, v in inds_fase.items() if v["grupo"] == "sobrepeso"), None)
-
-with col_r1:
-    if ind_mag_key and not df_rank.empty:
-        top_m = df_rank.nlargest(15, ind_mag_key).sort_values(ind_mag_key, ascending=True)
-        fig_rm = go.Figure(layout=PLOTLY_BASE)
-        fig_rm.update_layout(
-            title=dict(text=f"🔴 Top 15 — {inds_fase[ind_mag_key]['label']}", font=dict(color="#e2eaf4", size=12)),
-            height=400, margin=dict(t=50, b=20, l=160, r=20),
+    with col1:
+        fig = go.Figure(layout=PLOTLY_BASE)
+        fig.update_layout(
+            title=dict(text="📉 Magreza / Baixo Peso", font=dict(color="#e2eaf4", size=13)),
+            height=340,
+            legend=dict(orientation="h", y=-0.32, font=dict(size=10)) if comparar else {},
         )
-        fig_rm.add_trace(go.Bar(
-            x=top_m[ind_mag_key],
-            y=top_m["MUNICIPIO"].apply(lambda x: x[:20] + "…" if len(x) > 20 else x),
-            orientation="h",
-            marker_color=[REGIAO_CORES.get(r, "#94a3b8") for r in top_m["REGIÃO"]],
-            marker_line_color=[REGIAO_CORES.get(r, "#94a3b8") for r in top_m["REGIÃO"]],
-            marker_line_width=1,
-            customdata=top_m[["REGIÃO", "Total"]].values,
-            hovertemplate="<b>%{y}</b><br>%{x:.1f}%<br>%{customdata[0]}<extra></extra>",
-        ))
-        fig_rm.update_xaxes(ticksuffix="%")
-        fig_rm.update_yaxes(tickfont=dict(size=10))
-        st.plotly_chart(fig_rm, use_container_width=True)
+        inds_m = [k for k, v in inds_fase.items() if v["grupo"] == "magreza"]
+        _add_dual_traces(fig, fase, inds_m, serie_all, serie_pbf, serie_ativa,
+                         ["#f43f5e","#fb7185","#fda4af","#fecdd3"], comparar)
+        fig.update_yaxes(ticksuffix="%")
+        st.plotly_chart(fig, use_container_width=True)
 
-with col_r2:
-    if ind_sob_key and not df_rank.empty:
-        top_s = df_rank.nlargest(15, ind_sob_key).sort_values(ind_sob_key, ascending=True)
-        fig_rs = go.Figure(layout=PLOTLY_BASE)
-        fig_rs.update_layout(
-            title=dict(text=f"🟡 Top 15 — {inds_fase[ind_sob_key]['label']}", font=dict(color="#e2eaf4", size=12)),
-            height=400, margin=dict(t=50, b=20, l=160, r=20),
+    with col2:
+        fig = go.Figure(layout=PLOTLY_BASE)
+        fig.update_layout(
+            title=dict(text="📈 Sobrepeso & Obesidade", font=dict(color="#e2eaf4", size=13)),
+            height=340,
+            legend=dict(orientation="h", y=-0.32, font=dict(size=10)) if comparar else {},
         )
-        fig_rs.add_trace(go.Bar(
-            x=top_s[ind_sob_key],
-            y=top_s["MUNICIPIO"].apply(lambda x: x[:20] + "…" if len(x) > 20 else x),
-            orientation="h",
-            marker_color=[REGIAO_CORES.get(r, "#94a3b8") for r in top_s["REGIÃO"]],
-            marker_line_color=[REGIAO_CORES.get(r, "#94a3b8") for r in top_s["REGIÃO"]],
-            marker_line_width=1,
-            customdata=top_s[["REGIÃO", "Total"]].values,
-            hovertemplate="<b>%{y}</b><br>%{x:.1f}%<br>%{customdata[0]}<extra></extra>",
-        ))
-        fig_rs.update_xaxes(ticksuffix="%")
-        fig_rs.update_yaxes(tickfont=dict(size=10))
-        st.plotly_chart(fig_rs, use_container_width=True)
+        inds_s = [k for k, v in inds_fase.items() if v["grupo"] == "sobrepeso"]
+        _add_dual_traces(fig, fase, inds_s, serie_all, serie_pbf, serie_ativa,
+                         ["#f59e0b","#ef4444","#dc2626","#a855f7","#7c3aed"], comparar)
+        fig.update_yaxes(ticksuffix="%")
+        st.plotly_chart(fig, use_container_width=True)
 
-st.markdown("---")
+    st.markdown("---")
 
-# =============================================================================
-# MAPA COROPLÉTICO — TOCANTINS
-# =============================================================================
-
-recorte_mapa = " · PBF" if use_pbf else " · Total"
-st.markdown(
-    f"<div class='section-header'>🗺️ Mapa Coroplético — "
-    f"{inds_fase[mapa_key]['label']}{recorte_mapa} ({ano_ref})</div>",
-    unsafe_allow_html=True,
-)
-
-geojson_to = carregar_geojson_tocantins()
-
-if geojson_to is None:
-    st.warning(
-        "⚠️ Não foi possível carregar o GeoJSON do IBGE. "
-        "Verifique sua conexão com a internet e recarregue a página.",
-        icon="🌐",
+    # Distribuição completa
+    fig_d = go.Figure(layout=PLOTLY_BASE)
+    fig_d.update_layout(
+        title=dict(text=f"📊 Distribuição Nutricional Completa{subtit}",
+                   font=dict(color="#e2eaf4", size=13)),
+        barmode="group", height=400,
+        legend=dict(orientation="h", y=-0.28, font=dict(size=10)),
+        margin=dict(t=50, b=90, l=60, r=20),
     )
-else:
-    df_mapa_base = df_atual[df_atual["Ano"] == ano_ref].copy()
-    if regiao != "Todas as Regiões":
-        df_mapa_base = df_mapa_base[df_mapa_base["REGIÃO DE SAÚDE"] == regiao]
+    for i, (k, v) in enumerate(inds_fase.items()):
+        cor = PALETA[i % len(PALETA)]
+        if comparar:
+            fig_d.add_trace(go.Bar(x=serie_all["Ano"], y=serie_all[k],
+                                   name=f"{v['label']} · Total",
+                                   marker_color=cor + "88", marker_line_color=cor,
+                                   marker_line_width=1, legendgroup=k))
+            fig_d.add_trace(go.Bar(x=serie_pbf["Ano"], y=serie_pbf[k],
+                                   name=f"{v['label']} · PBF",
+                                   marker_color=cor, marker_line_color=cor,
+                                   marker_line_width=1, legendgroup=k))
+        else:
+            fig_d.add_trace(go.Bar(x=serie_ativa["Ano"], y=serie_ativa[k],
+                                   name=v["label"], marker_color=cor))
+    fig_d.update_yaxes(ticksuffix="%")
+    st.plotly_chart(fig_d, use_container_width=True)
 
-    total_col_mapa = "TOTAL_PBF" if use_pbf else "TOTAL"
-    mapa_rows = []
-    for mun, grp in df_mapa_base.groupby("MUNICIPIO"):
-        codigo = int(grp["Código IBGE"].iloc[0])
-        val    = calcular_pct(grp, fase, mapa_key, use_pbf)
-        mapa_rows.append({
+# =============================================================================
+# PÁGINA 3 — HEATMAP MUNICIPAL
+# =============================================================================
+
+def pagina_heatmap(fase, df_atual, inds_fase, hm_key, ano_ref, regiao, use_pbf):
+    _cabecalho(fase, "🌡 Heatmap Municipal")
+    recorte = " · PBF" if use_pbf else " · Total"
+    st.markdown(
+        f"<div class='section-header'>🌡 Heatmap por Município — "
+        f"{inds_fase[hm_key]['label']}{recorte} ({ano_ref})</div>",
+        unsafe_allow_html=True,
+    )
+
+    df_base = df_atual.copy()
+    if regiao != "Todas as Regiões":
+        df_base = df_base[df_base["REGIÃO DE SAÚDE"] == regiao]
+    df_ano = df_base[df_base["Ano"] == ano_ref]
+
+    total_col = "TOTAL_PBF" if use_pbf else "TOTAL"
+    rows = []
+    for mun, grp in df_ano.groupby("MUNICIPIO"):
+        rows.append({
+            "MUNICIPIO": mun,
+            "REGIÃO":    grp["REGIÃO DE SAÚDE"].iloc[0],
+            "Total":     int(grp[total_col].sum()),
+            hm_key:      calcular_pct(grp, fase, hm_key, use_pbf),
+        })
+    df_hm = pd.DataFrame(rows).sort_values(hm_key, ascending=True)
+
+    grupo = inds_fase[hm_key]["grupo"]
+    colorscales = {
+        "eutrofia":  [[0,"#1e3350"],[0.5,"#059669"],[1,"#10b981"]],
+        "magreza":   [[0,"#1e3350"],[0.5,"#f87171"],[1,"#f43f5e"]],
+        "sobrepeso": [[0,"#1e3350"],[0.5,"#fbbf24"],[1,"#f59e0b"]],
+        "estatura":  [[0,"#1e3350"],[0.5,"#818cf8"],[1,"#6366f1"]],
+    }
+    cs = colorscales.get(grupo, [[0,"#1e3350"],[0.5,"#60a5fa"],[1,"#3b82f6"]])
+
+    fig = go.Figure(layout=PLOTLY_BASE)
+    fig.update_layout(
+        height=max(500, len(df_hm) * 19),
+        margin=dict(t=30, b=20, l=170, r=110),
+        yaxis=dict(tickfont=dict(size=9.5)),
+    )
+    fig.add_trace(go.Bar(
+        x=df_hm[hm_key], y=df_hm["MUNICIPIO"],
+        orientation="h",
+        marker=dict(color=df_hm[hm_key], colorscale=cs, showscale=True,
+                    colorbar=dict(title="%", ticksuffix="%",
+                                  tickfont=dict(color="#7a99b8"),
+                                  title_font=dict(color="#7a99b8"),
+                                  bgcolor="#111f33", bordercolor="#1e3350")),
+        customdata=df_hm[["REGIÃO","Total"]].values,
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            f"{inds_fase[hm_key]['label']}: %{{x:.1f}}%<br>"
+            "Região: %{customdata[0]}<br>"
+            "Total: %{customdata[1]:,}<extra></extra>"
+        ),
+    ))
+    fig.update_xaxes(ticksuffix="%")
+    st.plotly_chart(fig, use_container_width=True)
+
+# =============================================================================
+# PÁGINA 4 — MAPA COROPLÉTICO
+# =============================================================================
+
+def pagina_mapa(fase, df_atual, inds_fase, mapa_key, ano_ref, regiao, use_pbf):
+    _cabecalho(fase, "🗺️ Mapa Coroplético")
+    recorte = " · PBF" if use_pbf else " · Total"
+    st.markdown(
+        f"<div class='section-header'>🗺️ Mapa Coroplético — "
+        f"{inds_fase[mapa_key]['label']}{recorte} ({ano_ref})</div>",
+        unsafe_allow_html=True,
+    )
+
+    geojson = carregar_geojson_tocantins()
+    if geojson is None:
+        st.warning("⚠️ Não foi possível carregar o GeoJSON do IBGE. Verifique sua conexão.", icon="🌐")
+        return
+
+    df_base = df_atual[df_atual["Ano"] == ano_ref].copy()
+    if regiao != "Todas as Regiões":
+        df_base = df_base[df_base["REGIÃO DE SAÚDE"] == regiao]
+
+    total_col = "TOTAL_PBF" if use_pbf else "TOTAL"
+    rows = []
+    for mun, grp in df_base.groupby("MUNICIPIO"):
+        # Código IBGE com 7 dígitos — coincide com feat["id"] no GeoJSON
+        codigo = int(str(grp["Código IBGE"].iloc[0]).strip())
+        rows.append({
             "MUNICIPIO":   mun,
             "codigo_ibge": codigo,
             "REGIÃO":      grp["REGIÃO DE SAÚDE"].iloc[0],
-            "Total":       int(grp[total_col_mapa].sum()),
-            "valor":       val,
+            "Total":       int(grp[total_col].sum()),
+            "valor":       calcular_pct(grp, fase, mapa_key, use_pbf),
         })
-    df_mapa = pd.DataFrame(mapa_rows)
+    df_mapa = pd.DataFrame(rows)
 
-    grupo_mapa = inds_fase[mapa_key]["grupo"]
-    colorscales_mapa = {
-        "eutrofia":  [[0, "#0d2a1a"], [0.5, "#059669"], [1, "#10b981"]],
-        "magreza":   [[0, "#1a0d0d"], [0.5, "#dc2626"], [1, "#f43f5e"]],
-        "sobrepeso": [[0, "#1a1200"], [0.5, "#d97706"], [1, "#f59e0b"]],
-        "estatura":  [[0, "#0d0d2a"], [0.5, "#6366f1"], [1, "#818cf8"]],
-    }
-    colorscale_mapa = colorscales_mapa.get(grupo_mapa, [[0, "#0d1b2e"], [0.5, "#2563eb"], [1, "#3b82f6"]])
+    grupo = inds_fase[mapa_key]["grupo"]
+    cs_mapa = {
+        "eutrofia":  [[0,"#0d2a1a"],[0.5,"#059669"],[1,"#10b981"]],
+        "magreza":   [[0,"#1a0d0d"],[0.5,"#dc2626"],[1,"#f43f5e"]],
+        "sobrepeso": [[0,"#1a1200"],[0.5,"#d97706"],[1,"#f59e0b"]],
+        "estatura":  [[0,"#0d0d2a"],[0.5,"#6366f1"],[1,"#818cf8"]],
+    }.get(grupo, [[0,"#0d1b2e"],[0.5,"#2563eb"],[1,"#3b82f6"]])
+
     vmax = float(df_mapa["valor"].quantile(0.95)) if not df_mapa.empty else 100.0
 
-    fig_mapa = go.Figure(go.Choroplethmapbox(
-        geojson=geojson_to,
+    fig = go.Figure(go.Choroplethmapbox(
+        geojson=geojson,
         locations=df_mapa["codigo_ibge"],
         z=df_mapa["valor"],
         featureidkey="id",
-        colorscale=colorscale_mapa,
-        zmin=0,
-        zmax=vmax,
+        colorscale=cs_mapa,
+        zmin=0, zmax=vmax,
         marker_opacity=0.82,
         marker_line_width=0.6,
         marker_line_color="#0d1b2e",
@@ -869,14 +664,11 @@ else:
             title=dict(text="%", font=dict(color="#7a99b8", size=13)),
             ticksuffix="%",
             tickfont=dict(color="#7a99b8", size=11),
-            bgcolor="#111f33",
-            bordercolor="#1e3350",
-            borderwidth=1,
-            len=0.75,
-            thickness=14,
+            bgcolor="#111f33", bordercolor="#1e3350",
+            borderwidth=1, len=0.75, thickness=14,
         ),
         text=df_mapa["MUNICIPIO"],
-        customdata=df_mapa[["REGIÃO", "Total", "MUNICIPIO"]].values,
+        customdata=df_mapa[["REGIÃO","Total","MUNICIPIO"]].values,
         hovertemplate=(
             "<b>%{customdata[2]}</b><br>"
             f"<b>{inds_fase[mapa_key]['label']}:</b> %{{z:.1f}}%<br>"
@@ -885,7 +677,7 @@ else:
             "<extra></extra>"
         ),
     ))
-    fig_mapa.update_layout(
+    fig.update_layout(
         mapbox_style="carto-darkmatter",
         mapbox_zoom=5.6,
         mapbox_center={"lat": -10.18, "lon": -48.15},
@@ -893,11 +685,11 @@ else:
         paper_bgcolor="#111f33",
         margin=dict(t=10, b=10, l=10, r=10),
     )
-    st.plotly_chart(fig_mapa, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)
 
     # Legenda de regiões
     st.markdown(
-        "<div style='display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;margin-bottom:4px'>"
+        "<div style='display:flex;flex-wrap:wrap;gap:10px;margin-top:6px'>"
         + "".join(
             f"<span style='font-size:0.72rem;font-family:monospace;color:{cor};"
             f"background:rgba(0,0,0,0.3);border:1px solid {cor}44;"
@@ -908,200 +700,342 @@ else:
         unsafe_allow_html=True,
     )
 
-st.markdown("---")
-
 # =============================================================================
-# CORRELAÇÃO ENTRE INDICADORES
+# PÁGINA 5 — RANKINGS
 # =============================================================================
 
-recorte_corr = " · PBF" if use_pbf else " · Total"
-st.markdown(
-    f"<div class='section-header'>🔗 Correlação entre Indicadores — {fase}{recorte_corr}</div>",
-    unsafe_allow_html=True,
-)
+def pagina_rankings(fase, df_atual, inds_fase, regiao, use_pbf):
+    _cabecalho(fase, "🏆 Rankings")
+    st.markdown(f"<div class='section-header'>🏆 Ranking de Municípios — {max(ANOS)}</div>",
+                unsafe_allow_html=True)
 
-# Montar DataFrame de observações (município × ano)
-df_corr_base = df_atual.copy()
-if regiao != "Todas as Regiões":
-    df_corr_base = df_corr_base[df_corr_base["REGIÃO DE SAÚDE"] == regiao]
-if corr_escopo != "Todos os anos":
-    df_corr_base = df_corr_base[df_corr_base["Ano"] == int(corr_escopo)]
+    df_base = df_atual[df_atual["Ano"] == max(ANOS)].copy()
+    if regiao != "Todas as Regiões":
+        df_base = df_base[df_base["REGIÃO DE SAÚDE"] == regiao]
 
-obs_rows = []
-for _, grp in df_corr_base.groupby(["MUNICIPIO", "Ano"]):
-    row = {}
-    for k, v in inds_fase.items():
-        row[v["label"]] = calcular_pct(grp, fase, k, use_pbf)
-    obs_rows.append(row)
+    total_col = "TOTAL_PBF" if use_pbf else "TOTAL"
+    rows = []
+    for mun, grp in df_base.groupby("MUNICIPIO"):
+        row = {"MUNICIPIO": mun, "REGIÃO": grp["REGIÃO DE SAÚDE"].iloc[0],
+               "Total": int(grp[total_col].sum())}
+        for k in inds_fase:
+            row[k] = calcular_pct(grp, fase, k, use_pbf)
+        rows.append(row)
+    df_rank = pd.DataFrame(rows)
 
-df_obs = pd.DataFrame(obs_rows).dropna()
-n_obs  = len(df_obs)
+    ind_mag = next((k for k, v in inds_fase.items() if v["grupo"] == "magreza"), None)
+    ind_sob = next((k for k, v in inds_fase.items() if v["grupo"] == "sobrepeso"), None)
 
-if df_obs.shape[0] < 3 or df_obs.shape[1] < 2:
-    st.warning("Dados insuficientes para calcular correlação com os filtros atuais.")
-else:
+    col1, col2 = st.columns(2)
+
+    def _bar_ranking(col, key, titulo, cor_titulo):
+        if key is None or df_rank.empty:
+            return
+        top = df_rank.nlargest(15, key).sort_values(key, ascending=True)
+        fig = go.Figure(layout=PLOTLY_BASE)
+        fig.update_layout(
+            title=dict(text=titulo, font=dict(color=cor_titulo, size=12)),
+            height=420, margin=dict(t=50, b=20, l=165, r=20),
+        )
+        fig.add_trace(go.Bar(
+            x=top[key],
+            y=top["MUNICIPIO"].apply(lambda x: x[:22] + "…" if len(x) > 22 else x),
+            orientation="h",
+            marker_color=[REGIAO_CORES.get(r, "#94a3b8") for r in top["REGIÃO"]],
+            customdata=top[["REGIÃO","Total"]].values,
+            hovertemplate="<b>%{y}</b><br>%{x:.1f}%<br>%{customdata[0]}<extra></extra>",
+        ))
+        fig.update_xaxes(ticksuffix="%")
+        fig.update_yaxes(tickfont=dict(size=10))
+        col.plotly_chart(fig, use_container_width=True)
+
+    _bar_ranking(col1, ind_mag, f"🔴 Top 15 — {inds_fase[ind_mag]['label']}" if ind_mag else "", "#f87171")
+    _bar_ranking(col2, ind_sob, f"🟡 Top 15 — {inds_fase[ind_sob]['label']}" if ind_sob else "", "#fbbf24")
+
+    # Legenda de regiões
+    st.markdown(
+        "<div style='display:flex;flex-wrap:wrap;gap:10px;margin-top:6px'>"
+        + "".join(
+            f"<span style='font-size:0.72rem;font-family:monospace;color:{cor};"
+            f"background:rgba(0,0,0,0.3);border:1px solid {cor}44;"
+            f"padding:2px 8px;border-radius:12px'>⬤ {reg}</span>"
+            for reg, cor in REGIAO_CORES.items()
+        )
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+# =============================================================================
+# PÁGINA 6 — CORRELAÇÕES
+# =============================================================================
+
+def pagina_correlacao(fase, df_atual, inds_fase, regiao, use_pbf, corr_escopo, corr_metodo):
+    _cabecalho(fase, "🔗 Correlações")
+    recorte = " · PBF" if use_pbf else " · Total"
+    st.markdown(
+        f"<div class='section-header'>🔗 Correlação entre Indicadores — "
+        f"{fase}{recorte} · {corr_metodo}</div>",
+        unsafe_allow_html=True,
+    )
+
+    df_base = df_atual.copy()
+    if regiao != "Todas as Regiões":
+        df_base = df_base[df_base["REGIÃO DE SAÚDE"] == regiao]
+    df_base = df_base[df_base["Ano"] == int(corr_escopo)]
+
+    obs_rows = []
+    for _, grp in df_base.groupby(["MUNICIPIO", "Ano"]):
+        row = {}
+        for k, v in inds_fase.items():
+            row[v["label"]] = calcular_pct(grp, fase, k, use_pbf)
+        obs_rows.append(row)
+
+    df_obs = pd.DataFrame(obs_rows).dropna()
+    n_obs  = len(df_obs)
+
+    if df_obs.shape[0] < 3 or df_obs.shape[1] < 2:
+        st.warning("Dados insuficientes para calcular correlação com os filtros atuais.")
+        return
+
     metodo_str  = "pearson" if corr_metodo == "Pearson" else "spearman"
     corr_matrix = df_obs.corr(method=metodo_str)
+    labels      = list(corr_matrix.columns)
+    n           = len(labels)
+    corr_vals   = corr_matrix.values
 
-    labels    = list(corr_matrix.columns)
-    n         = len(labels)
-    corr_vals = corr_matrix.values
-
-    # Anotações — valor + ícone de sinal dentro de cada célula
     annotations = []
     for i in range(n):
         for j in range(n):
             val = corr_vals[i, j]
             if i == j:
-                txt   = "1.00"
-                icone = "◼"
+                txt, icone = "1.00", "◼"
             elif val > 0:
-                txt   = f"+{val:.2f}"
-                icone = "▲"
+                txt, icone = f"+{val:.2f}", "▲"
             elif val < 0:
-                txt   = f"{val:.2f}"
-                icone = "▼"
+                txt, icone = f"{val:.2f}", "▼"
             else:
-                txt   = "0.00"
-                icone = "○"
-
-            # Texto claro em extremos, mais sutil no centro
-            text_color = "#e2eaf4" if abs(val) > 0.35 else "#7a99b8"
-
+                txt, icone = "0.00", "○"
             annotations.append(dict(
                 x=j, y=i,
                 text=f"<b>{txt}</b><br><span style='font-size:9px'>{icone}</span>",
                 showarrow=False,
-                font=dict(color=text_color, size=11, family="IBM Plex Mono, monospace"),
+                font=dict(color="#e2eaf4" if abs(val) > 0.35 else "#7a99b8",
+                          size=11, family="IBM Plex Mono, monospace"),
                 xref="x", yref="y",
             ))
 
-    # Escala divergente: vermelho (-1) → azul-cinza (0) → verde (+1)
     colorscale_corr = [
-        [0.00, "#7f1d1d"],
-        [0.20, "#dc2626"],
-        [0.35, "#f87171"],
-        [0.50, "#162540"],
-        [0.65, "#34d399"],
-        [0.80, "#059669"],
-        [1.00, "#064e3b"],
+        [0.00,"#7f1d1d"],[0.20,"#dc2626"],[0.35,"#f87171"],
+        [0.50,"#162540"],[0.65,"#34d399"],[0.80,"#059669"],[1.00,"#064e3b"],
     ]
 
-    # ── Layout sem xaxis/yaxis no dict base para evitar conflito ──────────
-    # PLOTLY_BASE contém xaxis e yaxis; passá-los novamente causaria
-    # "multiple values for keyword argument". Usamos update_xaxes/update_yaxes.
-    PLOTLY_BASE_SEM_EIXOS = {k: v for k, v in PLOTLY_BASE.items()
-                             if k not in ("xaxis", "yaxis", "margin")}
-
-    fig_corr = go.Figure()
-    fig_corr.add_trace(go.Heatmap(
-        z=corr_vals,
-        x=labels,
-        y=labels,
+    BASE = {k: v for k, v in PLOTLY_BASE.items() if k not in ("xaxis","yaxis","margin")}
+    fig = go.Figure()
+    fig.add_trace(go.Heatmap(
+        z=corr_vals, x=labels, y=labels,
         zmin=-1, zmax=1, zmid=0,
         colorscale=colorscale_corr,
         showscale=True,
         colorbar=dict(
             title=dict(text="r", font=dict(color="#7a99b8", size=13)),
-            tickvals=[-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1],
-            ticktext=["-1.00", "-0.75", "-0.50", "-0.25", "0",
-                      "+0.25", "+0.50", "+0.75", "+1.00"],
+            tickvals=[-1,-.75,-.5,-.25,0,.25,.5,.75,1],
+            ticktext=["-1.00","-0.75","-0.50","-0.25","0","+0.25","+0.50","+0.75","+1.00"],
             tickfont=dict(color="#7a99b8", size=10),
-            bgcolor="#111f33",
-            bordercolor="#1e3350",
-            borderwidth=1,
-            len=0.9,
-            thickness=14,
+            bgcolor="#111f33", bordercolor="#1e3350",
+            borderwidth=1, len=0.9, thickness=14,
         ),
-        hovertemplate=(
-            "<b>%{y}</b><br>× <b>%{x}</b><br>"
-            "Correlação: <b>%{z:.3f}</b><extra></extra>"
-        ),
-        xgap=2,
-        ygap=2,
+        hovertemplate="<b>%{y}</b><br>× <b>%{x}</b><br>Correlação: <b>%{z:.3f}</b><extra></extra>",
+        xgap=2, ygap=2,
     ))
-
-    altura_corr = max(480, n * 58)
-    fig_corr.update_layout(
-        **PLOTLY_BASE_SEM_EIXOS,
-        height=altura_corr,
+    fig.update_layout(
+        **BASE,
+        height=max(480, n * 58),
         annotations=annotations,
         margin=dict(t=30, b=120, l=180, r=100),
     )
-    # Eixos definidos separadamente — sem conflito com PLOTLY_BASE
-    fig_corr.update_xaxes(
-        tickangle=-35,
-        tickfont=dict(size=10.5, color="#e2eaf4"),
-        showgrid=False,
-        side="bottom",
-        gridcolor="#1e3350",
-        linecolor="#1e3350",
-    )
-    fig_corr.update_yaxes(
-        tickfont=dict(size=10.5, color="#e2eaf4"),
-        showgrid=False,
-        autorange="reversed",
-        gridcolor="#1e3350",
-        linecolor="#1e3350",
+    fig.update_xaxes(tickangle=-35, tickfont=dict(size=10.5, color="#e2eaf4"),
+                     showgrid=False, side="bottom", linecolor="#1e3350")
+    fig.update_yaxes(tickfont=dict(size=10.5, color="#e2eaf4"),
+                     showgrid=False, autorange="reversed", linecolor="#1e3350")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown(f"""
+    <div style='display:flex;flex-wrap:wrap;gap:16px;margin-top:4px;
+                font-size:0.72rem;font-family:IBM Plex Mono,monospace;color:#7a99b8'>
+        <span>▲ <b style='color:#34d399'>positiva</b> — indicadores sobem juntos</span>
+        <span>▼ <b style='color:#f87171'>negativa</b> — um sobe quando o outro desce</span>
+        <span>○ <b style='color:#94a3b8'>nula</b> — sem relação linear</span>
+        <span style='color:#4a6a88'>
+            Método: {corr_metodo} &nbsp;|&nbsp; n = {n_obs} observações &nbsp;|&nbsp;
+            Recorte: {'PBF' if use_pbf else 'Total'} &nbsp;|&nbsp; Ano: {corr_escopo}
+        </span>
+    </div>""", unsafe_allow_html=True)
+
+# =============================================================================
+# PÁGINA 7 — TABELA DE DADOS
+# =============================================================================
+
+def pagina_tabela(fase, df_f, inds_fase, ano_ref, use_pbf, comparar):
+    _cabecalho(fase, "📋 Tabela de Dados")
+    modo  = "Beneficiários PBF" if use_pbf else ("Total vs PBF" if comparar else "Todos os Avaliados")
+    st.markdown(f"<div class='section-header'>📋 Tabela Detalhada — {fase} · {ano_ref} · {modo}</div>",
+                unsafe_allow_html=True)
+
+    df_tab     = tabela_municipios(df_f, fase, ano_ref, use_pbf=use_pbf)
+    df_fmt     = df_tab.copy()
+    cols_pct   = [v["label"] for v in inds_fase.values()]
+    for col in cols_pct:
+        if col in df_fmt.columns:
+            df_fmt[col] = df_fmt[col].apply(lambda x: f"{x:.1f}%")
+    df_fmt["Total"] = df_fmt["Total"].apply(lambda x: f"{int(x):,}".replace(",", "."))
+
+    st.dataframe(
+        df_fmt, use_container_width=True, height=460,
+        column_config={
+            "Município": st.column_config.TextColumn("Município", width="medium"),
+            "Região":    st.column_config.TextColumn("Região",    width="medium"),
+            "Total":     st.column_config.TextColumn("Total",     width="small"),
+        },
     )
 
-    st.plotly_chart(fig_corr, use_container_width=True)
+    sufixo = "_pbf" if use_pbf else "_total"
+    csv    = df_tab.to_csv(index=False, decimal=",", sep=";").encode("utf-8-sig")
+    st.download_button(
+        label="⬇️ Baixar tabela como CSV",
+        data=csv,
+        file_name=f"pbf_{fase.replace(' ','_')}_{ano_ref}{sufixo}.csv",
+        mime="text/csv",
+    )
 
-    # Legenda interpretativa
+# =============================================================================
+# SIDEBAR — NAVEGAÇÃO + FILTROS
+# =============================================================================
+
+with st.sidebar:
+
+    # ── Navegação ─────────────────────────────────────────────────────────────
+    st.markdown("<div class='nav-label'>Navegação</div>", unsafe_allow_html=True)
+    pagina_atual = st.session_state["pagina"]
+
+    for pkey, (emoji, plabel) in PAGINAS.items():
+        tipo = "primary" if pkey == pagina_atual else "secondary"
+        if st.button(f"{emoji}  {plabel}", key=f"nav_{pkey}",
+                     use_container_width=True, type=tipo):
+            st.session_state["pagina"] = pkey
+            st.rerun()
+
+    st.markdown("---")
+
+    # ── Filtros comuns ─────────────────────────────────────────────────────────
+    st.markdown("<div class='nav-label'>Filtros</div>", unsafe_allow_html=True)
+
+    fase = st.selectbox("🧒 Fase da Vida", list(ARQUIVOS.keys()))
+
+    regiao_opcoes = ["Todas as Regiões"] + REGIOES
+    regiao = st.selectbox("🗺 Região de Saúde", regiao_opcoes)
+
+    df_atual = DFS[fase]
+    if regiao != "Todas as Regiões":
+        muns_disp = sorted(df_atual[df_atual["REGIÃO DE SAÚDE"] == regiao]["MUNICIPIO"].unique())
+    else:
+        muns_disp = MUNICIPIOS
+
+    municipio = st.selectbox("🏙 Município", ["Todo o Estado (Tocantins)"] + muns_disp)
+    ano_ref   = st.selectbox("📅 Ano de Referência", list(reversed(ANOS)))
+
+    inds_fase = INDICADORES[fase]
+    ind_labels = {k: v["label"] for k, v in inds_fase.items()}
+
+    st.markdown("---")
+
+    # ── Recorte PBF (todas as páginas) ────────────────────────────────────────
+    pbf_modo = st.radio(
+        "👁 Recorte populacional",
+        ["Total (todos avaliados)", "Somente Beneficiários PBF", "Comparar Total vs PBF"],
+        index=0,
+        help=(
+            "**Total** — todos os avaliados.\n\n"
+            "**Somente PBF** — apenas beneficiários PBF.\n\n"
+            "**Comparar** — exibe as duas séries sobrepostas."
+        ),
+    )
+    use_pbf  = pbf_modo == "Somente Beneficiários PBF"
+    comparar = pbf_modo == "Comparar Total vs PBF"
+
+    # ── Filtros contextuais por página ────────────────────────────────────────
+    pagina_atual = st.session_state["pagina"]   # pode ter sido atualizado pelo st.rerun()
+
+    hm_key   = list(ind_labels.keys())[0]
+    mapa_key = list(ind_labels.keys())[0]
+    corr_escopo  = str(max(ANOS))
+    corr_metodo  = "Pearson"
+
+    if pagina_atual == "heatmap":
+        st.markdown("---")
+        st.markdown("<div class='nav-label'>Heatmap</div>", unsafe_allow_html=True)
+        hm_key = st.selectbox("🌡 Indicador", list(ind_labels.keys()),
+                               format_func=lambda k: ind_labels[k], key="hm_sel")
+
+    if pagina_atual == "mapa":
+        st.markdown("---")
+        st.markdown("<div class='nav-label'>Mapa Coroplético</div>", unsafe_allow_html=True)
+        mapa_key = st.selectbox("🗺️ Indicador", list(ind_labels.keys()),
+                                 format_func=lambda k: ind_labels[k], key="mapa_sel")
+
+    if pagina_atual == "correlacao":
+        st.markdown("---")
+        st.markdown("<div class='nav-label'>Correlação</div>", unsafe_allow_html=True)
+        corr_escopo = st.selectbox("Ano de referência",
+                                   [str(a) for a in sorted(ANOS, reverse=True)],
+                                   key="corr_ano")
+        corr_metodo = st.radio("Método", ["Pearson", "Spearman"],
+                                horizontal=True, key="corr_met")
+
+    st.markdown("---")
     st.markdown(
-        f"""
-        <div style='display:flex;flex-wrap:wrap;gap:16px;margin-top:4px;
-                    font-size:0.72rem;font-family:IBM Plex Mono,monospace;color:#7a99b8'>
-            <span>▲ <b style='color:#34d399'>positiva</b> — indicadores sobem juntos</span>
-            <span>▼ <b style='color:#f87171'>negativa</b> — um sobe quando o outro desce</span>
-            <span>○ <b style='color:#94a3b8'>nula</b> — sem relação linear</span>
-            <span style='margin-left:8px;color:#4a6a88'>
-                Método: {corr_metodo} &nbsp;|&nbsp;
-                n = {n_obs} observações (município × ano) &nbsp;|&nbsp;
-                Recorte: {'PBF' if use_pbf else 'Total'}
-            </span>
-        </div>
-        """,
+        "<small style='color:#4a6a88'>PBF · SISVAN · 2019–2025<br>"
+        "139 municípios · 8 regiões</small>",
         unsafe_allow_html=True,
     )
 
-st.markdown("---")
-
 # =============================================================================
-# TABELA DETALHADA
+# FILTRO GLOBAL DO DATAFRAME
 # =============================================================================
 
-modo_label = "Beneficiários PBF" if use_pbf else ("Total vs PBF" if comparar else "Todos os Avaliados")
-st.markdown(f"<div class='section-header'>📋 Tabela Detalhada — {fase} · {ano_ref} · {modo_label}</div>",
-            unsafe_allow_html=True)
+df_f = df_atual.copy()
+if regiao != "Todas as Regiões":
+    df_f = df_f[df_f["REGIÃO DE SAÚDE"] == regiao]
+if municipio != "Todo o Estado (Tocantins)":
+    df_f = df_f[df_f["MUNICIPIO"] == municipio]
 
-df_tab = tabela_municipios(df_f, fase, ano_ref, use_pbf=use_pbf)
-
-# Formatar colunas de percentual
-cols_pct = [v["label"] for v in inds_fase.values()]
-df_tab_fmt = df_tab.copy()
-for col in cols_pct:
-    if col in df_tab_fmt.columns:
-        df_tab_fmt[col] = df_tab_fmt[col].apply(lambda x: f"{x:.1f}%")
-df_tab_fmt["Total"] = df_tab_fmt["Total"].apply(lambda x: f"{int(x):,}".replace(",", "."))
-
-st.dataframe(
-    df_tab_fmt,
-    use_container_width=True,
-    height=420,
-    column_config={
-        "Município": st.column_config.TextColumn("Município", width="medium"),
-        "Região":    st.column_config.TextColumn("Região",    width="medium"),
-        "Total":     st.column_config.TextColumn("Total",     width="small"),
-    },
+escopo_label = (
+    municipio if municipio != "Todo o Estado (Tocantins)"
+    else (regiao if regiao != "Todas as Regiões" else "Tocantins (Estado)")
 )
 
-# Botão de download
-sufixo_csv = "_pbf" if use_pbf else "_total"
-csv = df_tab.to_csv(index=False, decimal=",", sep=";").encode("utf-8-sig")
-st.download_button(
-    label="⬇️ Baixar tabela como CSV",
-    data=csv,
-    file_name=f"pbf_{fase.replace(' ', '_')}_{ano_ref}{sufixo_csv}.csv",
-    mime="text/csv",
-)
+# =============================================================================
+# ROTEAMENTO DE PÁGINAS
+# =============================================================================
+
+p = st.session_state["pagina"]
+
+if p == "visao_geral":
+    pagina_visao_geral(fase, df_f, inds_fase, ano_ref, use_pbf, comparar, escopo_label)
+
+elif p == "serie_temporal":
+    pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label)
+
+elif p == "heatmap":
+    pagina_heatmap(fase, df_atual, inds_fase, hm_key, ano_ref, regiao, use_pbf)
+
+elif p == "mapa":
+    pagina_mapa(fase, df_atual, inds_fase, mapa_key, ano_ref, regiao, use_pbf)
+
+elif p == "rankings":
+    pagina_rankings(fase, df_atual, inds_fase, regiao, use_pbf)
+
+elif p == "correlacao":
+    pagina_correlacao(fase, df_atual, inds_fase, regiao, use_pbf, corr_escopo, corr_metodo)
+
+elif p == "tabela":
+    pagina_tabela(fase, df_f, inds_fase, ano_ref, use_pbf, comparar)
