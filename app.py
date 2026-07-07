@@ -962,34 +962,37 @@ with st.sidebar:
     use_pbf  = pbf_modo == "Somente Beneficiários PBF"
     comparar = pbf_modo == "Comparar Total vs PBF"
 
-    # ── Filtros contextuais por página ────────────────────────────────────────
-    pagina_atual = st.session_state["pagina"]   # pode ter sido atualizado pelo st.rerun()
+    # ── Indicador — sempre visível (Heatmap e Mapa usam este valor) ──────────
+    st.markdown("---")
+    st.markdown("<div class='nav-label'>Indicador visualizado</div>", unsafe_allow_html=True)
+    indicador_sel = st.selectbox(
+        "🎯 Indicador",
+        list(ind_labels.keys()),
+        format_func=lambda k: ind_labels[k],
+        key="indicador_global",
+        help="Usado no Heatmap Municipal, no Mapa Coroplético e no destaque do Ranking.",
+    )
+    hm_key   = indicador_sel
+    mapa_key = indicador_sel
 
-    hm_key   = list(ind_labels.keys())[0]
-    mapa_key = list(ind_labels.keys())[0]
-    corr_escopo  = str(max(ANOS))
-    corr_metodo  = "Pearson"
+    # ── Filtros extras de Correlação (só quando relevante, mas sempre acessíveis) ──
+    st.markdown("---")
+    st.markdown("<div class='nav-label'>Correlação</div>", unsafe_allow_html=True)
+    corr_escopo = st.selectbox(
+        "📅 Ano (correlação)",
+        [str(a) for a in sorted(ANOS, reverse=True)],
+        key="corr_ano",
+    )
+    corr_metodo = st.radio(
+        "Método",
+        ["Pearson", "Spearman"],
+        horizontal=True,
+        key="corr_met",
+        help="**Pearson** — correlação linear.\n\n**Spearman** — por postos, mais robusto a outliers.",
+    )
 
-    if pagina_atual == "heatmap":
-        st.markdown("---")
-        st.markdown("<div class='nav-label'>Heatmap</div>", unsafe_allow_html=True)
-        hm_key = st.selectbox("🌡 Indicador", list(ind_labels.keys()),
-                               format_func=lambda k: ind_labels[k], key="hm_sel")
-
-    if pagina_atual == "mapa":
-        st.markdown("---")
-        st.markdown("<div class='nav-label'>Mapa Coroplético</div>", unsafe_allow_html=True)
-        mapa_key = st.selectbox("🗺️ Indicador", list(ind_labels.keys()),
-                                 format_func=lambda k: ind_labels[k], key="mapa_sel")
-
-    if pagina_atual == "correlacao":
-        st.markdown("---")
-        st.markdown("<div class='nav-label'>Correlação</div>", unsafe_allow_html=True)
-        corr_escopo = st.selectbox("Ano de referência",
-                                   [str(a) for a in sorted(ANOS, reverse=True)],
-                                   key="corr_ano")
-        corr_metodo = st.radio("Método", ["Pearson", "Spearman"],
-                                horizontal=True, key="corr_met")
+    # atualiza referência da página corrente após possível st.rerun()
+    pagina_atual = st.session_state["pagina"]
 
     st.markdown("---")
     st.markdown(
