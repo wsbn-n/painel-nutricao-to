@@ -490,7 +490,7 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
     with col1:
         fig = go.Figure(layout=PLOTLY_BASE)
         fig.update_layout(
-            title=dict(text="📉 Magreza / Baixo Peso", font=dict(color="#e2eaf4", size=13)),
+            title=dict(text="📉 Magreza / Baixo Peso", font=dict(color="#000000", size=13)),
             height=340,
             legend=dict(orientation="h", y=-0.32, font=dict(size=10)) if comparar else {},
         )
@@ -503,7 +503,7 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
     with col2:
         fig = go.Figure(layout=PLOTLY_BASE)
         fig.update_layout(
-            title=dict(text="📈 Sobrepeso & Obesidade", font=dict(color="#e2eaf4", size=13)),
+            title=dict(text="📈 Sobrepeso & Obesidade", font=dict(color="#000000", size=13)),
             height=340,
             legend=dict(orientation="h", y=-0.32, font=dict(size=10)) if comparar else {},
         )
@@ -519,7 +519,7 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
     fig_d = go.Figure(layout=PLOTLY_BASE)
     fig_d.update_layout(
         title=dict(text=f"📊 Distribuição Nutricional Completa{subtit}",
-                   font=dict(color="#e2eaf4", size=13)),
+                   font=dict(color="#000000", size=13)),
         barmode="group", height=400,
         legend=dict(orientation="h", y=-0.28, font=dict(size=10)),
         margin=dict(t=50, b=90, l=60, r=20),
