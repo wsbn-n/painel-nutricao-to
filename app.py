@@ -250,7 +250,7 @@ FASE_DESCRICAO = {
 }
 
 PLOTLY_BASE = dict(
-    paper_bgcolor="#ffffff",
+    paper_bgcolor="#000000",
     plot_bgcolor="#ffffff",
     font=dict(color="#000000", family="Inter, sans-serif", size=12),
     margin=dict(t=50, b=40, l=60, r=20),
