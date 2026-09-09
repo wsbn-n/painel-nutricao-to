@@ -43,7 +43,7 @@ st.markdown("""
 
     /* Cards de métricas */
     [data-testid="metric-container"] {
-        background-color: #ffffff;
+        background-color: #e2eaf4;
         border: 1px solid #1e3350;
         border-radius: 10px;
         padding: 16px 20px;
