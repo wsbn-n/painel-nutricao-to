@@ -34,7 +34,7 @@ st.markdown("""
     section[data-testid="stSidebar"] { background-color: #0d1b2e; border-right: 1px solid #1e3350; }
 
     /* Textos */
-    html, body, [class*="css"] { color: #e2eaf4; font-family: 'Inter', sans-serif; }
+    html, body, [class*="css"] { color: #000000; font-family: 'Inter', sans-serif; }
     h1, h2, h3 { color: #e2eaf4 !important; }
     label, .stSelectbox label, .stMultiSelect label, .stRadio label {
         color: #7a99b8 !important; font-size: 0.75rem !important;
@@ -112,7 +112,7 @@ st.markdown("""
     }
     div[data-testid="stButton"] button[kind="secondary"]:hover {
         border-color: #00d4aa88 !important;
-        color: #e2eaf4 !important;
+        color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -819,7 +819,7 @@ def pagina_correlacao(fase, df_atual, inds_fase, regiao, use_pbf, corr_escopo, c
                 x=j, y=i,
                 text=f"<b>{txt}</b><br><span style='font-size:9px'>{icone}</span>",
                 showarrow=False,
-                font=dict(color="#e2eaf4" if abs(val) > 0.35 else "#7a99b8",
+                font=dict(color="#000000" if abs(val) > 0.35 else "#7a99b8",
                           size=11, family="IBM Plex Mono, monospace"),
                 xref="x", yref="y",
             ))
