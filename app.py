@@ -256,8 +256,8 @@ PLOTLY_BASE = dict(
     margin=dict(t=50, b=40, l=60, r=20),
     xaxis=dict(gridcolor="#1e3350", linecolor="#1e3350", zerolinecolor="#1e3350"),
     yaxis=dict(gridcolor="#1e3350", linecolor="#1e3350", zerolinecolor="#1e3350"),
-    legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="#1e3350", font=dict(size=11)),
-    hoverlabel=dict(bgcolor="#162540", font_color="#000000", bordercolor="#1e3350"),
+    legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="#000000", font=dict(size=11)),
+    hoverlabel=dict(bgcolor="#000000", font_color="#000000", bordercolor="#000000"),
 )
 
 PALETA = ["#10b981","#f43f5e","#f59e0b","#ef4444","#818cf8",
