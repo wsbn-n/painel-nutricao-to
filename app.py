@@ -112,14 +112,31 @@ def _plotly_base():
     return dict(
         paper_bgcolor=T["paper_bg"],
         plot_bgcolor=T["plot_bg"],
-        font=dict(color=T["muted"], family="Inter, sans-serif", size=12),
+        font=dict(color=T["text"], family="Inter, sans-serif", size=12),
         margin=dict(t=50, b=40, l=60, r=20),
-        xaxis=dict(gridcolor=T["grid"], linecolor=T["grid"], zerolinecolor=T["grid"]),
-        yaxis=dict(gridcolor=T["grid"], linecolor=T["grid"], zerolinecolor=T["grid"]),
-        legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor=T["grid"], font=dict(size=11)),
-        hoverlabel=dict(bgcolor=T["hover_bg"], font_color=T["hover_text"],
-                        bordercolor=T["hover_border"]),
+        xaxis=dict(
+            gridcolor=T["grid"], linecolor=T["grid"], zerolinecolor=T["grid"],
+            tickfont=dict(color=T["text"]),
+            title_font=dict(color=T["text"]),
+        ),
+        yaxis=dict(
+            gridcolor=T["grid"], linecolor=T["grid"], zerolinecolor=T["grid"],
+            tickfont=dict(color=T["text"]),
+            title_font=dict(color=T["text"]),
+        ),
+        legend=dict(
+            bgcolor=T["card_bg"],
+            bordercolor=T["card_border"],
+            borderwidth=1,
+            font=dict(size=11, color=T["text"]),
+        ),
+        hoverlabel=dict(
+            bgcolor=T["hover_bg"],
+            font_color=T["hover_text"],
+            bordercolor=T["hover_border"],
+        ),
     )
+
 
 
 PLOTLY_BASE = _plotly_base()
@@ -165,6 +182,24 @@ st.markdown(f"""
         background-color: {T['card_bg']} !important;
         border: 1px solid {T['card_border']} !important;
         color: {T['text']} !important;
+    }}
+    /* Valor selecionado e spans internos */
+    .stSelectbox span, .stSelectbox p,
+    .stSelectbox > div > div > div {{ color: {T['text']} !important; }}
+    /* Lista de opções abertas */
+    div[data-baseweb="popover"] ul,
+    div[data-baseweb="menu"] {{
+        background-color: {T['card_bg']} !important;
+        border: 1px solid {T['card_border']} !important;
+    }}
+    div[data-baseweb="menu"] li,
+    div[data-baseweb="option"] {{
+        background-color: {T['card_bg']} !important;
+        color: {T['text']} !important;
+    }}
+    div[data-baseweb="menu"] li:hover,
+    div[data-baseweb="option"]:hover {{
+        background-color: {T['grid']} !important;
     }}
 
     /* ── Radio buttons ─────────────────────────── */
@@ -601,7 +636,12 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
         fig.update_layout(
             title=dict(text="📉 Magreza / Baixo Peso", font=dict(color=T["text"], size=13)),
             height=340,
-            legend=dict(orientation="h", y=-0.32, font=dict(size=10)) if comparar else {},
+            legend=dict(
+                orientation="h", y=-0.34,
+                font=dict(size=10, color=T["text"]),
+                bgcolor=T["card_bg"],
+                bordercolor=T["card_border"],
+            ) if comparar else {},
         )
         inds_m = [k for k, v in inds_fase.items() if v["grupo"] == "magreza"]
         _add_dual_traces(fig, fase, inds_m, serie_all, serie_pbf, serie_ativa,
@@ -614,7 +654,12 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
         fig.update_layout(
             title=dict(text="📈 Sobrepeso & Obesidade", font=dict(color=T["text"], size=13)),
             height=340,
-            legend=dict(orientation="h", y=-0.32, font=dict(size=10)) if comparar else {},
+            legend=dict(
+                orientation="h", y=-0.34,
+                font=dict(size=10, color=T["text"]),
+                bgcolor=T["card_bg"],
+                bordercolor=T["card_border"],
+            ) if comparar else {},
         )
         inds_s = [k for k, v in inds_fase.items() if v["grupo"] == "sobrepeso"]
         _add_dual_traces(fig, fase, inds_s, serie_all, serie_pbf, serie_ativa,
@@ -628,9 +673,15 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
     fig_d.update_layout(
         title=dict(text=f"📊 Distribuição Nutricional Completa{subtit}",
                    font=dict(color=T["text"], size=13)),
-        barmode="group", height=400,
-        legend=dict(orientation="h", y=-0.28, font=dict(size=10)),
-        margin=dict(t=50, b=90, l=60, r=20),
+        barmode="group", height=440,
+        legend=dict(
+            orientation="h", y=-0.32,
+            font=dict(size=10, color=T["text"]),
+            bgcolor=T["card_bg"],
+            bordercolor=T["card_border"],
+            borderwidth=1,
+        ),
+        margin=dict(t=50, b=120, l=60, r=20),
     )
     for i, (k, v) in enumerate(inds_fase.items()):
         cor = PALETA[i % len(PALETA)]
@@ -748,7 +799,7 @@ def pagina_mapa(fase, df_atual, inds_fase, mapa_key, ano_ref, regiao, use_pbf):
     cs     = T["cs"].get(grupo, [[0, T["card_bg"]], [0.5, "#2563eb"], [1, "#1d4ed8"]])
     vmax   = float(df_mapa["valor"].quantile(0.95)) if not df_mapa.empty else 100.0
 
-    fig = go.Figure(go.Choroplethmapbox(
+    fig = go.Figure(go.Choroplethmap(
         geojson=geojson,
         locations=df_mapa["codigo_ibge"],
         z=df_mapa["valor"],
@@ -774,9 +825,9 @@ def pagina_mapa(fase, df_atual, inds_fase, mapa_key, ano_ref, regiao, use_pbf):
         ),
     ))
     fig.update_layout(
-        mapbox_style=T["mapbox"],
-        mapbox_zoom=5.6,
-        mapbox_center={"lat": -10.18, "lon": -48.15},
+        map_style=T["mapbox"],
+        map_zoom=5.6,
+        map_center={"lat": -10.18, "lon": -48.15},
         height=640,
         paper_bgcolor=T["paper_bg"],
         margin=dict(t=10, b=10, l=10, r=10),
