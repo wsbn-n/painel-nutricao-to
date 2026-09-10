@@ -27,93 +27,238 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown("""
+# ── Session state inicial ──────────────────────────────────────────────────────
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = "visao_geral"
+if "tema" not in st.session_state:
+    st.session_state["tema"] = "escuro"
+
+# =============================================================================
+# SISTEMA DE TEMAS (escuro / claro)
+# =============================================================================
+
+TEMAS = {
+    "escuro": {
+        "bg":               "#06101e",
+        "sidebar_bg":       "#0d1b2e",
+        "card_bg":          "#111f33",
+        "card_border":      "#1e3350",
+        "text":             "#e2eaf4",
+        "muted":            "#7a99b8",
+        "faint":            "#4a6a88",
+        "accent":           "#00d4aa",
+        "grid":             "#1e3350",
+        "plot_bg":          "#111f33",
+        "paper_bg":         "#111f33",
+        "hover_bg":         "#162540",
+        "hover_text":       "#e2eaf4",
+        "hover_border":     "#1e3350",
+        "hr":               "#1e3350",
+        "mapbox":           "carto-darkmatter",
+        "btn_active_bg":    "#00d4aa22",
+        "btn_active_border":"#00d4aa",
+        "btn_active_text":  "#00d4aa",
+        "btn_border":       "#1e3350",
+        "btn_text":         "#7a99b8",
+        "corr_center":      "#162540",
+        "tema_icon":        "☀️",
+        "tema_label":       "Tema Claro",
+        "cs": {
+            "eutrofia":  [[0, "#0d2219"], [0.5, "#059669"], [1, "#10b981"]],
+            "magreza":   [[0, "#200d10"], [0.5, "#e11d48"], [1, "#f43f5e"]],
+            "sobrepeso": [[0, "#1a1200"], [0.5, "#d97706"], [1, "#f59e0b"]],
+            "estatura":  [[0, "#0d0d22"], [0.5, "#6366f1"], [1, "#818cf8"]],
+        },
+    },
+    "claro": {
+        "bg":               "#f1f5f9",
+        "sidebar_bg":       "#ffffff",
+        "card_bg":          "#ffffff",
+        "card_border":      "#e2e8f0",
+        "text":             "#1e293b",
+        "muted":            "#64748b",
+        "faint":            "#94a3b8",
+        "accent":           "#0d9488",
+        "grid":             "#e2e8f0",
+        "plot_bg":          "#ffffff",
+        "paper_bg":         "#f8fafc",
+        "hover_bg":         "#f8fafc",
+        "hover_text":       "#1e293b",
+        "hover_border":     "#e2e8f0",
+        "hr":               "#e2e8f0",
+        "mapbox":           "carto-positron",
+        "btn_active_bg":    "#0d94881a",
+        "btn_active_border":"#0d9488",
+        "btn_active_text":  "#0d9488",
+        "btn_border":       "#e2e8f0",
+        "btn_text":         "#64748b",
+        "corr_center":      "#f0faf9",
+        "tema_icon":        "🌙",
+        "tema_label":       "Tema Escuro",
+        "cs": {
+            "eutrofia":  [[0, "#f0fdf4"], [0.5, "#16a34a"], [1, "#14532d"]],
+            "magreza":   [[0, "#fff1f2"], [0.5, "#dc2626"], [1, "#7f1d1d"]],
+            "sobrepeso": [[0, "#fffbeb"], [0.5, "#d97706"], [1, "#92400e"]],
+            "estatura":  [[0, "#eef2ff"], [0.5, "#4f46e5"], [1, "#312e81"]],
+        },
+    },
+}
+
+_tema = st.session_state.get("tema", "escuro")
+T     = TEMAS[_tema]
+
+
+def _plotly_base():
+    return dict(
+        paper_bgcolor=T["paper_bg"],
+        plot_bgcolor=T["plot_bg"],
+        font=dict(color=T["muted"], family="Inter, sans-serif", size=12),
+        margin=dict(t=50, b=40, l=60, r=20),
+        xaxis=dict(gridcolor=T["grid"], linecolor=T["grid"], zerolinecolor=T["grid"]),
+        yaxis=dict(gridcolor=T["grid"], linecolor=T["grid"], zerolinecolor=T["grid"]),
+        legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor=T["grid"], font=dict(size=11)),
+        hoverlabel=dict(bgcolor=T["hover_bg"], font_color=T["hover_text"],
+                        bordercolor=T["hover_border"]),
+    )
+
+
+PLOTLY_BASE = _plotly_base()
+
+# =============================================================================
+# CSS DINÂMICO (segue o tema ativo)
+# =============================================================================
+
+st.markdown(f"""
 <style>
-    /* Fundo geral */
-    .stApp { background-color: #06101e; }
-    section[data-testid="stSidebar"] { background-color: #0d1b2e; border-right: 1px solid #1e3350; }
+    /* ── Fundo geral ───────────────────────────── */
+    .stApp {{ background-color: {T['bg']}; }}
+    section[data-testid="stSidebar"] {{
+        background-color: {T['sidebar_bg']};
+        border-right: 1px solid {T['card_border']};
+    }}
 
-    /* Textos */
-    html, body, [class*="css"] { color: #000000; font-family: 'Inter', sans-serif; }
-    h1, h2, h3 { color: #e2eaf4 !important; }
-    label, .stSelectbox label, .stMultiSelect label, .stRadio label {
-        color: #7a99b8 !important; font-size: 0.75rem !important;
-        text-transform: uppercase; letter-spacing: 0.06em;
-    }
+    /* ── Textos ────────────────────────────────── */
+    html, body, [class*="css"] {{ color: {T['text']}; font-family: 'Inter', sans-serif; }}
+    h1, h2, h3 {{ color: {T['text']} !important; }}
+    p, span, div {{ color: inherit; }}
+    label, .stSelectbox label, .stMultiSelect label, .stRadio label {{
+        color: {T['muted']} !important;
+        font-size: 0.75rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }}
 
-    /* Cards de métricas */
-    [data-testid="metric-container"] {
-        background-color: #e2eaf4;
-        border: 1px solid #1e3350;
+    /* ── Cards de métricas ─────────────────────── */
+    [data-testid="metric-container"] {{
+        background-color: {T['card_bg']};
+        border: 1px solid {T['card_border']};
         border-radius: 10px;
         padding: 16px 20px;
-    }
-    [data-testid="stMetricValue"] { color: #00d4aa; font-weight: 800; }
-    [data-testid="stMetricLabel"] { color: #7a99b8; font-size: 0.7rem; }
+    }}
+    [data-testid="stMetricValue"] {{ color: {T['accent']}; font-weight: 800; }}
+    [data-testid="stMetricLabel"] {{ color: {T['muted']}; font-size: 0.7rem; }}
+    [data-testid="stMetricDelta"] {{ font-size: 0.75rem; }}
 
-    /* Dropdowns */
-    .stSelectbox > div > div {
-        background-color: #111f33 !important;
-        border: 1px solid #1e3350 !important;
-        color: #e2eaf4 !important;
-    }
+    /* ── Dropdowns / Selectbox ─────────────────── */
+    .stSelectbox > div > div,
+    .stMultiSelect > div > div {{
+        background-color: {T['card_bg']} !important;
+        border: 1px solid {T['card_border']} !important;
+        color: {T['text']} !important;
+    }}
 
-    /* Dividers */
-    hr { border-color: #1e3350; }
+    /* ── Radio buttons ─────────────────────────── */
+    .stRadio > div {{ gap: 6px; }}
 
-    /* Tabela */
-    .dataframe { background-color: #111f33 !important; color: #e2eaf4 !important; }
-    thead tr th { background-color: #162540 !important; color: #7a99b8 !important; font-size: 0.72rem !important; }
+    /* ── Dividers ──────────────────────────────── */
+    hr {{ border-color: {T['hr']}; margin: 12px 0; }}
 
-    /* Info box */
-    .info-box {
-        background-color: #111f33;
-        border: 1px solid #1e3350;
-        border-left: 3px solid #00d4aa;
+    /* ── Tabela ────────────────────────────────── */
+    .dataframe {{
+        background-color: {T['card_bg']} !important;
+        color: {T['text']} !important;
+    }}
+    thead tr th {{
+        background-color: {T['card_bg']} !important;
+        color: {T['muted']} !important;
+        font-size: 0.72rem !important;
+    }}
+
+    /* ── Info box ──────────────────────────────── */
+    .info-box {{
+        background-color: {T['card_bg']};
+        border: 1px solid {T['card_border']};
+        border-left: 3px solid {T['accent']};
         border-radius: 8px;
         padding: 12px 16px;
         font-size: 0.82rem;
-        color: #7a99b8;
+        color: {T['muted']};
         margin-bottom: 20px;
-    }
-    .info-box strong { color: #00d4aa; }
+    }}
+    .info-box strong {{ color: {T['accent']}; }}
 
-    /* Section headers */
-    .section-header {
+    /* ── Section headers ───────────────────────── */
+    .section-header {{
         font-size: 1rem;
         font-weight: 700;
-        color: #e2eaf4;
+        color: {T['text']};
         padding-bottom: 6px;
-        border-bottom: 1px solid #1e3350;
+        border-bottom: 1px solid {T['hr']};
         margin-bottom: 16px;
-    }
+    }}
 
-    /* Navegação — rótulo do grupo */
-    .nav-label {
-        color: #4a6a88;
+    /* ── Rótulos de grupo no sidebar ───────────── */
+    .nav-label {{
+        color: {T['faint']};
         font-size: 0.68rem;
         text-transform: uppercase;
         letter-spacing: 0.10em;
         font-weight: 700;
         margin: 6px 0 4px 4px;
-    }
+    }}
 
-    /* Botão de navegação ativo */
-    div[data-testid="stButton"] button[kind="primary"] {
-        background-color: #00d4aa22 !important;
-        border: 1px solid #00d4aa !important;
-        color: #00d4aa !important;
+    /* ── Botões de navegação ───────────────────── */
+    div[data-testid="stButton"] button[kind="primary"] {{
+        background-color: {T['btn_active_bg']} !important;
+        border: 1px solid {T['btn_active_border']} !important;
+        color: {T['btn_active_text']} !important;
         font-weight: 700;
-    }
-    div[data-testid="stButton"] button[kind="secondary"] {
+    }}
+    div[data-testid="stButton"] button[kind="secondary"] {{
         background-color: transparent !important;
-        border: 1px solid #1e3350 !important;
-        color: #7a99b8 !important;
-    }
-    div[data-testid="stButton"] button[kind="secondary"]:hover {
-        border-color: #00d4aa88 !important;
-        color: #000000 !important;
-    }
+        border: 1px solid {T['btn_border']} !important;
+        color: {T['btn_text']} !important;
+    }}
+    div[data-testid="stButton"] button[kind="secondary"]:hover {{
+        border-color: {T['accent']}88 !important;
+        color: {T['text']} !important;
+    }}
+
+    /* ── Toggle de tema ────────────────────────── */
+    .tema-toggle-box {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: {T['card_bg']};
+        border: 1px solid {T['card_border']};
+        border-radius: 10px;
+        padding: 8px 14px;
+        margin-bottom: 12px;
+        font-size: 0.8rem;
+        color: {T['muted']};
+    }}
+    .tema-toggle-box strong {{ color: {T['accent']}; font-size: 0.85rem; }}
+
+    /* ── Download button ───────────────────────── */
+    .stDownloadButton > button {{
+        background-color: {T['card_bg']} !important;
+        border: 1px solid {T['card_border']} !important;
+        color: {T['text']} !important;
+    }}
+    .stDownloadButton > button:hover {{
+        border-color: {T['accent']} !important;
+        color: {T['accent']} !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -209,25 +354,18 @@ INDICADORES = {
         "obesidade_grave":        {"cols_n": ["OG"],   "cols_pct": ["OG2"],   "label": "Obesidade Grave",            "grupo": "sobrepeso"},
     },
     "Adultos": {
-        "baixo_peso":   {"cols_n": ["BP"],    "cols_pct": ["BP%"],    "label": "Baixo Peso",         "grupo": "magreza"},
-        "eutrofia":     {"cols_n": ["E"],     "cols_pct": ["E%"],     "label": "Eutrofia",            "grupo": "eutrofia"},
-        "sobrepeso":    {"cols_n": ["S"],     "cols_pct": ["S%"],     "label": "Sobrepeso",           "grupo": "sobrepeso"},
-        "obesidade_g1": {"cols_n": ["OGI"],  "cols_pct": ["OGI%"],  "label": "Obesidade Grau I",    "grupo": "sobrepeso"},
-        "obesidade_g2": {"cols_n": ["OGII"], "cols_pct": ["OGII%"], "label": "Obesidade Grau II",   "grupo": "sobrepeso"},
-        "obesidade_g3": {"cols_n": ["OGIII"],"cols_pct": ["OGIII%"],"label": "Obesidade Grau III",  "grupo": "sobrepeso"},
+        "baixo_peso":   {"cols_n": ["BP"],     "cols_pct": ["BP%"],    "label": "Baixo Peso",        "grupo": "magreza"},
+        "eutrofia":     {"cols_n": ["E"],      "cols_pct": ["E%"],     "label": "Eutrofia",           "grupo": "eutrofia"},
+        "sobrepeso":    {"cols_n": ["S"],      "cols_pct": ["S%"],     "label": "Sobrepeso",          "grupo": "sobrepeso"},
+        "obesidade_g1": {"cols_n": ["OGI"],   "cols_pct": ["OGI%"],  "label": "Obesidade Grau I",   "grupo": "sobrepeso"},
+        "obesidade_g2": {"cols_n": ["OGII"],  "cols_pct": ["OGII%"], "label": "Obesidade Grau II",  "grupo": "sobrepeso"},
+        "obesidade_g3": {"cols_n": ["OGIII"], "cols_pct": ["OGIII%"],"label": "Obesidade Grau III", "grupo": "sobrepeso"},
     },
     "Idosos": {
         "baixo_peso": {"cols_n": ["BP"], "cols_pct": ["BP%"], "label": "Baixo Peso", "grupo": "magreza"},
         "eutrofia":   {"cols_n": ["E"],  "cols_pct": ["E%"],  "label": "Eutrofia",   "grupo": "eutrofia"},
         "sobrepeso":  {"cols_n": ["S"],  "cols_pct": ["S%"],  "label": "Sobrepeso",  "grupo": "sobrepeso"},
     },
-}
-
-GRUPO_CORES = {
-    "magreza":   "#f43f5e",
-    "sobrepeso": "#f59e0b",
-    "eutrofia":  "#10b981",
-    "estatura":  "#818cf8",
 }
 
 REGIAO_CORES = {
@@ -249,24 +387,6 @@ FASE_DESCRICAO = {
     "Idosos":       "Idosos (60+ anos). Classificação pelo IMC adaptado: baixo peso, eutrofia e sobrepeso.",
 }
 
-PLOTLY_BASE = dict(
-    paper_bgcolor="#000000",
-    plot_bgcolor="#ffffff",
-    font=dict(color="#000000", family="Inter, sans-serif", size=12),
-    margin=dict(t=50, b=40, l=60, r=20),
-    xaxis=dict(gridcolor="#1e3350", linecolor="#1e3350", zerolinecolor="#1e3350"),
-    yaxis=dict(gridcolor="#1e3350", linecolor="#1e3350", zerolinecolor="#1e3350"),
-    legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="#000000", font=dict(size=11)),
-    hoverlabel=dict(bgcolor="#000000", font_color="#000000", bordercolor="#000000"),
-)
-
-PALETA = ["#10b981","#f43f5e","#f59e0b","#ef4444","#818cf8",
-          "#0891b2","#db2777","#65a30d","#d97706","#a855f7","#059669","#dc2626"]
-
-# =============================================================================
-# PÁGINAS — definição
-# =============================================================================
-
 PAGINAS = {
     "visao_geral":    ("🏠", "Visão Geral"),
     "serie_temporal": ("📈", "Série Temporal"),
@@ -277,8 +397,8 @@ PAGINAS = {
     "tabela":         ("📋", "Tabela de Dados"),
 }
 
-if "pagina" not in st.session_state:
-    st.session_state["pagina"] = "visao_geral"
+PALETA = ["#10b981","#f43f5e","#f59e0b","#ef4444","#818cf8",
+          "#0891b2","#db2777","#65a30d","#d97706","#a855f7","#059669","#dc2626"]
 
 # =============================================================================
 # CARREGAMENTO DOS DADOS
@@ -296,10 +416,6 @@ def carregar_dados():
 
 @st.cache_data(show_spinner="Carregando mapa do IBGE...")
 def carregar_geojson_tocantins():
-    """
-    Baixa o GeoJSON dos municípios do Tocantins via API do IBGE.
-    Mantém o código de 7 dígitos completo para coincidir com a planilha.
-    """
     url = (
         "https://servicodados.ibge.gov.br/api/v3/malhas/estados/17"
         "?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=municipio"
@@ -310,13 +426,12 @@ def carregar_geojson_tocantins():
         geojson = resp.json()
         for feat in geojson["features"]:
             cod = str(feat["properties"].get("codarea", "")).strip()
-            # ── CORREÇÃO: usa os 7 dígitos completos ──
             feat["id"] = int(cod) if cod.isdigit() else None
         return geojson
     except Exception:
         return None
 
-DFS       = carregar_dados()
+DFS        = carregar_dados()
 MUNICIPIOS = sorted(DFS["0-5 Anos"]["MUNICIPIO"].unique().tolist())
 ANOS       = sorted(DFS["0-5 Anos"]["Ano"].unique().tolist())
 REGIOES    = sorted(DFS["0-5 Anos"]["REGIÃO DE SAÚDE"].unique().tolist())
@@ -371,16 +486,13 @@ def _add_dual_traces(fig, fase, ind_keys, serie_total, serie_pbf, serie_ativa,
         if comparar:
             fig.add_trace(go.Scatter(
                 x=serie_total["Ano"], y=serie_total[k],
-                name=f"{lbl} · Total",
-                mode="lines+markers",
-                line=dict(width=2.5, color=cor),
-                marker=dict(size=5),
+                name=f"{lbl} · Total", mode="lines+markers",
+                line=dict(width=2.5, color=cor), marker=dict(size=5),
                 legendgroup=k,
             ))
             fig.add_trace(go.Scatter(
                 x=serie_pbf["Ano"], y=serie_pbf[k],
-                name=f"{lbl} · PBF",
-                mode="lines+markers",
+                name=f"{lbl} · PBF", mode="lines+markers",
                 line=dict(width=2, color=cor, dash="dot"),
                 marker=dict(size=4, symbol="diamond"),
                 legendgroup=k,
@@ -389,10 +501,8 @@ def _add_dual_traces(fig, fase, ind_keys, serie_total, serie_pbf, serie_ativa,
             r, g, b = int(cor[1:3], 16), int(cor[3:5], 16), int(cor[5:7], 16)
             fig.add_trace(go.Scatter(
                 x=serie_ativa["Ano"], y=serie_ativa[k],
-                name=lbl,
-                mode="lines+markers",
-                line=dict(width=2.5, color=cor),
-                marker=dict(size=5),
+                name=lbl, mode="lines+markers",
+                line=dict(width=2.5, color=cor), marker=dict(size=5),
                 fill="tozeroy" if i == 0 else "none",
                 fillcolor=f"rgba({r},{g},{b},0.10)" if i == 0 else "rgba(0,0,0,0)",
             ))
@@ -404,12 +514,12 @@ def _add_dual_traces(fig, fase, ind_keys, serie_total, serie_pbf, serie_ativa,
 def _cabecalho(fase, pagina_label):
     st.markdown(f"""
     <div style='padding:4px 0 12px 0'>
-        <h1 style='margin:0;font-size:1.5rem;color:#00d4aa;font-weight:800'>
+        <h1 style='margin:0;font-size:1.5rem;color:{T['accent']};font-weight:800'>
             📊 Dashboard Vigilância Nutricional · PBF Tocantins
         </h1>
-        <p style='color:#7a99b8;font-size:0.78rem;margin:4px 0 0 0;font-family:monospace'>
+        <p style='color:{T['muted']};font-size:0.78rem;margin:4px 0 0 0;font-family:monospace'>
             Programa Bolsa Família · SISVAN · 2019–2025 · 139 municípios · 8 regiões &nbsp;·&nbsp;
-            <span style='color:#00d4aa'>{pagina_label}</span>
+            <span style='color:{T['accent']}'>{pagina_label}</span>
         </p>
     </div>""", unsafe_allow_html=True)
     st.markdown(
@@ -486,11 +596,10 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
     serie_pbf   = serie_temporal(df_f, fase, use_pbf=True)
 
     col1, col2 = st.columns(2)
-
     with col1:
         fig = go.Figure(layout=PLOTLY_BASE)
         fig.update_layout(
-            title=dict(text="📉 Magreza / Baixo Peso", font=dict(color="#000000", size=13)),
+            title=dict(text="📉 Magreza / Baixo Peso", font=dict(color=T["text"], size=13)),
             height=340,
             legend=dict(orientation="h", y=-0.32, font=dict(size=10)) if comparar else {},
         )
@@ -503,7 +612,7 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
     with col2:
         fig = go.Figure(layout=PLOTLY_BASE)
         fig.update_layout(
-            title=dict(text="📈 Sobrepeso & Obesidade", font=dict(color="#000000", size=13)),
+            title=dict(text="📈 Sobrepeso & Obesidade", font=dict(color=T["text"], size=13)),
             height=340,
             legend=dict(orientation="h", y=-0.32, font=dict(size=10)) if comparar else {},
         )
@@ -515,11 +624,10 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
 
     st.markdown("---")
 
-    # Distribuição completa
     fig_d = go.Figure(layout=PLOTLY_BASE)
     fig_d.update_layout(
         title=dict(text=f"📊 Distribuição Nutricional Completa{subtit}",
-                   font=dict(color="#000000", size=13)),
+                   font=dict(color=T["text"], size=13)),
         barmode="group", height=400,
         legend=dict(orientation="h", y=-0.28, font=dict(size=10)),
         margin=dict(t=50, b=90, l=60, r=20),
@@ -533,8 +641,7 @@ def pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label
                                    marker_line_width=1, legendgroup=k))
             fig_d.add_trace(go.Bar(x=serie_pbf["Ano"], y=serie_pbf[k],
                                    name=f"{v['label']} · PBF",
-                                   marker_color=cor, marker_line_color=cor,
-                                   marker_line_width=1, legendgroup=k))
+                                   marker_color=cor, legendgroup=k))
         else:
             fig_d.add_trace(go.Bar(x=serie_ativa["Ano"], y=serie_ativa[k],
                                    name=v["label"], marker_color=cor))
@@ -571,28 +678,26 @@ def pagina_heatmap(fase, df_atual, inds_fase, hm_key, ano_ref, regiao, use_pbf):
     df_hm = pd.DataFrame(rows).sort_values(hm_key, ascending=True)
 
     grupo = inds_fase[hm_key]["grupo"]
-    colorscales = {
-        "eutrofia":  [[0,"#1e3350"],[0.5,"#059669"],[1,"#10b981"]],
-        "magreza":   [[0,"#1e3350"],[0.5,"#f87171"],[1,"#f43f5e"]],
-        "sobrepeso": [[0,"#1e3350"],[0.5,"#fbbf24"],[1,"#f59e0b"]],
-        "estatura":  [[0,"#1e3350"],[0.5,"#818cf8"],[1,"#6366f1"]],
-    }
-    cs = colorscales.get(grupo, [[0,"#1e3350"],[0.5,"#60a5fa"],[1,"#3b82f6"]])
+    cs    = T["cs"].get(grupo, [[0, T["card_bg"]], [0.5, "#60a5fa"], [1, "#3b82f6"]])
 
     fig = go.Figure(layout=PLOTLY_BASE)
     fig.update_layout(
         height=max(500, len(df_hm) * 19),
         margin=dict(t=30, b=20, l=170, r=110),
-        yaxis=dict(tickfont=dict(size=9.5)),
+        yaxis=dict(tickfont=dict(size=9.5, color=T["muted"])),
     )
     fig.add_trace(go.Bar(
         x=df_hm[hm_key], y=df_hm["MUNICIPIO"],
         orientation="h",
-        marker=dict(color=df_hm[hm_key], colorscale=cs, showscale=True,
-                    colorbar=dict(title="%", ticksuffix="%",
-                                  tickfont=dict(color="#7a99b8"),
-                                  title_font=dict(color="#7a99b8"),
-                                  bgcolor="#111f33", bordercolor="#1e3350")),
+        marker=dict(
+            color=df_hm[hm_key], colorscale=cs, showscale=True,
+            colorbar=dict(
+                title="%", ticksuffix="%",
+                tickfont=dict(color=T["muted"]),
+                title_font=dict(color=T["muted"]),
+                bgcolor=T["paper_bg"], bordercolor=T["card_border"],
+            ),
+        ),
         customdata=df_hm[["REGIÃO","Total"]].values,
         hovertemplate=(
             "<b>%{y}</b><br>"
@@ -619,7 +724,7 @@ def pagina_mapa(fase, df_atual, inds_fase, mapa_key, ano_ref, regiao, use_pbf):
 
     geojson = carregar_geojson_tocantins()
     if geojson is None:
-        st.warning("⚠️ Não foi possível carregar o GeoJSON do IBGE. Verifique sua conexão.", icon="🌐")
+        st.warning("⚠️ Não foi possível carregar o GeoJSON do IBGE. Verifique sua conexão.")
         return
 
     df_base = df_atual[df_atual["Ano"] == ano_ref].copy()
@@ -629,7 +734,6 @@ def pagina_mapa(fase, df_atual, inds_fase, mapa_key, ano_ref, regiao, use_pbf):
     total_col = "TOTAL_PBF" if use_pbf else "TOTAL"
     rows = []
     for mun, grp in df_base.groupby("MUNICIPIO"):
-        # Código IBGE com 7 dígitos — coincide com feat["id"] no GeoJSON
         codigo = int(str(grp["Código IBGE"].iloc[0]).strip())
         rows.append({
             "MUNICIPIO":   mun,
@@ -640,60 +744,50 @@ def pagina_mapa(fase, df_atual, inds_fase, mapa_key, ano_ref, regiao, use_pbf):
         })
     df_mapa = pd.DataFrame(rows)
 
-    grupo = inds_fase[mapa_key]["grupo"]
-    cs_mapa = {
-        "eutrofia":  [[0,"#0d2a1a"],[0.5,"#059669"],[1,"#10b981"]],
-        "magreza":   [[0,"#1a0d0d"],[0.5,"#dc2626"],[1,"#f43f5e"]],
-        "sobrepeso": [[0,"#1a1200"],[0.5,"#d97706"],[1,"#f59e0b"]],
-        "estatura":  [[0,"#0d0d2a"],[0.5,"#6366f1"],[1,"#818cf8"]],
-    }.get(grupo, [[0,"#0d1b2e"],[0.5,"#2563eb"],[1,"#3b82f6"]])
-
-    vmax = float(df_mapa["valor"].quantile(0.95)) if not df_mapa.empty else 100.0
+    grupo  = inds_fase[mapa_key]["grupo"]
+    cs     = T["cs"].get(grupo, [[0, T["card_bg"]], [0.5, "#2563eb"], [1, "#1d4ed8"]])
+    vmax   = float(df_mapa["valor"].quantile(0.95)) if not df_mapa.empty else 100.0
 
     fig = go.Figure(go.Choroplethmapbox(
         geojson=geojson,
         locations=df_mapa["codigo_ibge"],
         z=df_mapa["valor"],
         featureidkey="id",
-        colorscale=cs_mapa,
+        colorscale=cs,
         zmin=0, zmax=vmax,
         marker_opacity=0.82,
         marker_line_width=0.6,
-        marker_line_color="#0d1b2e",
+        marker_line_color=T["bg"],
         colorbar=dict(
-            title=dict(text="%", font=dict(color="#7a99b8", size=13)),
+            title=dict(text="%", font=dict(color=T["muted"], size=13)),
             ticksuffix="%",
-            tickfont=dict(color="#7a99b8", size=11),
-            bgcolor="#111f33", bordercolor="#1e3350",
+            tickfont=dict(color=T["muted"], size=11),
+            bgcolor=T["paper_bg"], bordercolor=T["card_border"],
             borderwidth=1, len=0.75, thickness=14,
         ),
-        text=df_mapa["MUNICIPIO"],
         customdata=df_mapa[["REGIÃO","Total","MUNICIPIO"]].values,
         hovertemplate=(
             "<b>%{customdata[2]}</b><br>"
             f"<b>{inds_fase[mapa_key]['label']}:</b> %{{z:.1f}}%<br>"
             "<b>Região:</b> %{customdata[0]}<br>"
-            "<b>Total avaliados:</b> %{customdata[1]:,}"
-            "<extra></extra>"
+            "<b>Total avaliados:</b> %{customdata[1]:,}<extra></extra>"
         ),
     ))
     fig.update_layout(
-        mapbox_style="carto-darkmatter",
+        mapbox_style=T["mapbox"],
         mapbox_zoom=5.6,
         mapbox_center={"lat": -10.18, "lon": -48.15},
         height=640,
-        paper_bgcolor="#111f33",
+        paper_bgcolor=T["paper_bg"],
         margin=dict(t=10, b=10, l=10, r=10),
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Legenda de regiões
     st.markdown(
         "<div style='display:flex;flex-wrap:wrap;gap:10px;margin-top:6px'>"
         + "".join(
             f"<span style='font-size:0.72rem;font-family:monospace;color:{cor};"
-            f"background:rgba(0,0,0,0.3);border:1px solid {cor}44;"
-            f"padding:2px 10px;border-radius:12px'>⬤ {reg}</span>"
+            f"border:1px solid {cor}44;padding:2px 10px;border-radius:12px'>⬤ {reg}</span>"
             for reg, cor in REGIAO_CORES.items()
         )
         + "</div>",
@@ -746,19 +840,19 @@ def pagina_rankings(fase, df_atual, inds_fase, regiao, use_pbf):
             hovertemplate="<b>%{y}</b><br>%{x:.1f}%<br>%{customdata[0]}<extra></extra>",
         ))
         fig.update_xaxes(ticksuffix="%")
-        fig.update_yaxes(tickfont=dict(size=10))
+        fig.update_yaxes(tickfont=dict(size=10, color=T["muted"]))
         col.plotly_chart(fig, use_container_width=True)
 
-    _bar_ranking(col1, ind_mag, f"🔴 Top 15 — {inds_fase[ind_mag]['label']}" if ind_mag else "", "#f87171")
-    _bar_ranking(col2, ind_sob, f"🟡 Top 15 — {inds_fase[ind_sob]['label']}" if ind_sob else "", "#fbbf24")
+    _bar_ranking(col1, ind_mag,
+                 f"🔴 Top 15 — {inds_fase[ind_mag]['label']}" if ind_mag else "", "#f87171")
+    _bar_ranking(col2, ind_sob,
+                 f"🟡 Top 15 — {inds_fase[ind_sob]['label']}" if ind_sob else "", "#fbbf24")
 
-    # Legenda de regiões
     st.markdown(
         "<div style='display:flex;flex-wrap:wrap;gap:10px;margin-top:6px'>"
         + "".join(
             f"<span style='font-size:0.72rem;font-family:monospace;color:{cor};"
-            f"background:rgba(0,0,0,0.3);border:1px solid {cor}44;"
-            f"padding:2px 8px;border-radius:12px'>⬤ {reg}</span>"
+            f"border:1px solid {cor}44;padding:2px 8px;border-radius:12px'>⬤ {reg}</span>"
             for reg, cor in REGIAO_CORES.items()
         )
         + "</div>",
@@ -816,35 +910,36 @@ def pagina_correlacao(fase, df_atual, inds_fase, regiao, use_pbf, corr_escopo, c
             else:
                 txt, icone = "0.00", "○"
             annotations.append(dict(
-                x=j, y=i,
-                text=f"<b>{txt}</b><br><span style='font-size:9px'>{icone}</span>",
+                x=j, y=i, text=f"<b>{txt}</b>",
                 showarrow=False,
-                font=dict(color="#000000" if abs(val) > 0.35 else "#7a99b8",
+                font=dict(color=T["text"] if abs(val) > 0.35 else T["muted"],
                           size=11, family="IBM Plex Mono, monospace"),
                 xref="x", yref="y",
             ))
 
+    # Colorscale de correlação adaptada ao tema
     colorscale_corr = [
-        [0.00,"#7f1d1d"],[0.20,"#dc2626"],[0.35,"#f87171"],
-        [0.50,"#162540"],[0.65,"#34d399"],[0.80,"#059669"],[1.00,"#064e3b"],
+        [0.00, "#7f1d1d"], [0.20, "#dc2626"], [0.35, "#f87171"],
+        [0.50, T["corr_center"]],
+        [0.65, "#34d399"], [0.80, "#059669"], [1.00, "#064e3b"],
     ]
 
     BASE = {k: v for k, v in PLOTLY_BASE.items() if k not in ("xaxis","yaxis","margin")}
-    fig = go.Figure()
+    fig  = go.Figure()
     fig.add_trace(go.Heatmap(
         z=corr_vals, x=labels, y=labels,
         zmin=-1, zmax=1, zmid=0,
         colorscale=colorscale_corr,
         showscale=True,
         colorbar=dict(
-            title=dict(text="r", font=dict(color="#7a99b8", size=13)),
-            tickvals=[-1,-.75,-.5,-.25,0,.25,.5,.75,1],
-            ticktext=["-1.00","-0.75","-0.50","-0.25","0","+0.25","+0.50","+0.75","+1.00"],
-            tickfont=dict(color="#7a99b8", size=10),
-            bgcolor="#111f33", bordercolor="#1e3350",
+            title=dict(text="r", font=dict(color=T["muted"], size=13)),
+            tickvals=[-1, -.5, 0, .5, 1],
+            ticktext=["-1.00", "-0.50", "0", "+0.50", "+1.00"],
+            tickfont=dict(color=T["muted"], size=10),
+            bgcolor=T["paper_bg"], bordercolor=T["card_border"],
             borderwidth=1, len=0.9, thickness=14,
         ),
-        hovertemplate="<b>%{y}</b><br>× <b>%{x}</b><br>Correlação: <b>%{z:.3f}</b><extra></extra>",
+        hovertemplate="<b>%{y}</b><br>× <b>%{x}</b><br>r = <b>%{z:.3f}</b><extra></extra>",
         xgap=2, ygap=2,
     ))
     fig.update_layout(
@@ -853,21 +948,20 @@ def pagina_correlacao(fase, df_atual, inds_fase, regiao, use_pbf, corr_escopo, c
         annotations=annotations,
         margin=dict(t=30, b=120, l=180, r=100),
     )
-    fig.update_xaxes(tickangle=-35, tickfont=dict(size=10.5, color="#e2eaf4"),
-                     showgrid=False, side="bottom", linecolor="#1e3350")
-    fig.update_yaxes(tickfont=dict(size=10.5, color="#e2eaf4"),
-                     showgrid=False, autorange="reversed", linecolor="#1e3350")
+    fig.update_xaxes(tickangle=-35, tickfont=dict(size=10.5, color=T["text"]),
+                     showgrid=False, side="bottom", linecolor=T["hr"])
+    fig.update_yaxes(tickfont=dict(size=10.5, color=T["text"]),
+                     showgrid=False, autorange="reversed", linecolor=T["hr"])
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown(f"""
     <div style='display:flex;flex-wrap:wrap;gap:16px;margin-top:4px;
-                font-size:0.72rem;font-family:IBM Plex Mono,monospace;color:#7a99b8'>
+                font-size:0.72rem;font-family:IBM Plex Mono,monospace;color:{T['muted']}'>
         <span>▲ <b style='color:#34d399'>positiva</b> — indicadores sobem juntos</span>
         <span>▼ <b style='color:#f87171'>negativa</b> — um sobe quando o outro desce</span>
-        <span>○ <b style='color:#94a3b8'>nula</b> — sem relação linear</span>
-        <span style='color:#4a6a88'>
-            Método: {corr_metodo} &nbsp;|&nbsp; n = {n_obs} observações &nbsp;|&nbsp;
-            Recorte: {'PBF' if use_pbf else 'Total'} &nbsp;|&nbsp; Ano: {corr_escopo}
+        <span style='color:{T['faint']}'>
+            Método: {corr_metodo} &nbsp;|&nbsp; n = {n_obs} obs. &nbsp;|&nbsp;
+            {'PBF' if use_pbf else 'Total'} &nbsp;|&nbsp; Ano: {corr_escopo}
         </span>
     </div>""", unsafe_allow_html=True)
 
@@ -877,14 +971,13 @@ def pagina_correlacao(fase, df_atual, inds_fase, regiao, use_pbf, corr_escopo, c
 
 def pagina_tabela(fase, df_f, inds_fase, ano_ref, use_pbf, comparar):
     _cabecalho(fase, "📋 Tabela de Dados")
-    modo  = "Beneficiários PBF" if use_pbf else ("Total vs PBF" if comparar else "Todos os Avaliados")
+    modo = "Beneficiários PBF" if use_pbf else ("Total vs PBF" if comparar else "Todos os Avaliados")
     st.markdown(f"<div class='section-header'>📋 Tabela Detalhada — {fase} · {ano_ref} · {modo}</div>",
                 unsafe_allow_html=True)
 
-    df_tab     = tabela_municipios(df_f, fase, ano_ref, use_pbf=use_pbf)
-    df_fmt     = df_tab.copy()
-    cols_pct   = [v["label"] for v in inds_fase.values()]
-    for col in cols_pct:
+    df_tab   = tabela_municipios(df_f, fase, ano_ref, use_pbf=use_pbf)
+    df_fmt   = df_tab.copy()
+    for col in [v["label"] for v in inds_fase.values()]:
         if col in df_fmt.columns:
             df_fmt[col] = df_fmt[col].apply(lambda x: f"{x:.1f}%")
     df_fmt["Total"] = df_fmt["Total"].apply(lambda x: f"{int(x):,}".replace(",", "."))
@@ -908,12 +1001,30 @@ def pagina_tabela(fase, df_f, inds_fase, ano_ref, use_pbf, comparar):
     )
 
 # =============================================================================
-# SIDEBAR — NAVEGAÇÃO + FILTROS
+# SIDEBAR — TEMA + NAVEGAÇÃO + FILTROS
 # =============================================================================
 
 with st.sidebar:
 
-    # ── Navegação ─────────────────────────────────────────────────────────────
+    # ── Seletor de tema ────────────────────────────────────────────────────────
+    st.markdown(
+        f"<div class='tema-toggle-box'>"
+        f"<strong>{'🌙 Tema Escuro' if _tema == 'escuro' else '☀️ Tema Claro'}</strong>"
+        f"<span style='color:{T['faint']};font-size:0.7rem'>aparência</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        f"{T['tema_icon']}  Mudar para {T['tema_label']}",
+        use_container_width=True,
+        key="btn_tema",
+    ):
+        st.session_state["tema"] = "claro" if _tema == "escuro" else "escuro"
+        st.rerun()
+
+    st.markdown("---")
+
+    # ── Navegação ──────────────────────────────────────────────────────────────
     st.markdown("<div class='nav-label'>Navegação</div>", unsafe_allow_html=True)
     pagina_atual = st.session_state["pagina"]
 
@@ -932,51 +1043,46 @@ with st.sidebar:
     fase = st.selectbox("🧒 Fase da Vida", list(ARQUIVOS.keys()))
 
     regiao_opcoes = ["Todas as Regiões"] + REGIOES
-    regiao = st.selectbox("🗺 Região de Saúde", regiao_opcoes)
+    regiao        = st.selectbox("🗺 Região de Saúde", regiao_opcoes)
 
-    df_atual = DFS[fase]
-    if regiao != "Todas as Regiões":
-        muns_disp = sorted(df_atual[df_atual["REGIÃO DE SAÚDE"] == regiao]["MUNICIPIO"].unique())
-    else:
-        muns_disp = MUNICIPIOS
+    df_atual  = DFS[fase]
+    muns_disp = (sorted(df_atual[df_atual["REGIÃO DE SAÚDE"] == regiao]["MUNICIPIO"].unique())
+                 if regiao != "Todas as Regiões" else MUNICIPIOS)
 
     municipio = st.selectbox("🏙 Município", ["Todo o Estado (Tocantins)"] + muns_disp)
     ano_ref   = st.selectbox("📅 Ano de Referência", list(reversed(ANOS)))
 
-    inds_fase = INDICADORES[fase]
+    inds_fase  = INDICADORES[fase]
     ind_labels = {k: v["label"] for k, v in inds_fase.items()}
 
     st.markdown("---")
 
-    # ── Recorte PBF (todas as páginas) ────────────────────────────────────────
+    # ── Recorte PBF ────────────────────────────────────────────────────────────
     pbf_modo = st.radio(
         "👁 Recorte populacional",
         ["Total (todos avaliados)", "Somente Beneficiários PBF", "Comparar Total vs PBF"],
         index=0,
-        help=(
-            "**Total** — todos os avaliados.\n\n"
-            "**Somente PBF** — apenas beneficiários PBF.\n\n"
-            "**Comparar** — exibe as duas séries sobrepostas."
-        ),
     )
     use_pbf  = pbf_modo == "Somente Beneficiários PBF"
     comparar = pbf_modo == "Comparar Total vs PBF"
 
-    # ── Indicador — sempre visível (Heatmap e Mapa usam este valor) ──────────
     st.markdown("---")
+
+    # ── Indicador visualizado (Heatmap e Mapa) ─────────────────────────────────
     st.markdown("<div class='nav-label'>Indicador visualizado</div>", unsafe_allow_html=True)
     indicador_sel = st.selectbox(
         "🎯 Indicador",
         list(ind_labels.keys()),
         format_func=lambda k: ind_labels[k],
         key="indicador_global",
-        help="Usado no Heatmap Municipal, no Mapa Coroplético e no destaque do Ranking.",
+        help="Usado no Heatmap Municipal e no Mapa Coroplético.",
     )
     hm_key   = indicador_sel
     mapa_key = indicador_sel
 
-    # ── Filtros extras de Correlação (só quando relevante, mas sempre acessíveis) ──
     st.markdown("---")
+
+    # ── Correlação ────────────────────────────────────────────────────────────
     st.markdown("<div class='nav-label'>Correlação</div>", unsafe_allow_html=True)
     corr_escopo = st.selectbox(
         "📅 Ano (correlação)",
@@ -984,20 +1090,15 @@ with st.sidebar:
         key="corr_ano",
     )
     corr_metodo = st.radio(
-        "Método",
-        ["Pearson", "Spearman"],
-        horizontal=True,
-        key="corr_met",
-        help="**Pearson** — correlação linear.\n\n**Spearman** — por postos, mais robusto a outliers.",
+        "Método", ["Pearson", "Spearman"], horizontal=True, key="corr_met",
     )
 
-    # atualiza referência da página corrente após possível st.rerun()
     pagina_atual = st.session_state["pagina"]
 
     st.markdown("---")
     st.markdown(
-        "<small style='color:#4a6a88'>PBF · SISVAN · 2019–2025<br>"
-        "139 municípios · 8 regiões</small>",
+        f"<small style='color:{T['faint']}'>PBF · SISVAN · 2019–2025<br>"
+        f"139 municípios · 8 regiões</small>",
         unsafe_allow_html=True,
     )
 
@@ -1022,23 +1123,17 @@ escopo_label = (
 
 p = st.session_state["pagina"]
 
-if p == "visao_geral":
+if   p == "visao_geral":
     pagina_visao_geral(fase, df_f, inds_fase, ano_ref, use_pbf, comparar, escopo_label)
-
 elif p == "serie_temporal":
     pagina_serie_temporal(fase, df_f, inds_fase, use_pbf, comparar, escopo_label)
-
 elif p == "heatmap":
     pagina_heatmap(fase, df_atual, inds_fase, hm_key, ano_ref, regiao, use_pbf)
-
 elif p == "mapa":
     pagina_mapa(fase, df_atual, inds_fase, mapa_key, ano_ref, regiao, use_pbf)
-
 elif p == "rankings":
     pagina_rankings(fase, df_atual, inds_fase, regiao, use_pbf)
-
 elif p == "correlacao":
     pagina_correlacao(fase, df_atual, inds_fase, regiao, use_pbf, corr_escopo, corr_metodo)
-
 elif p == "tabela":
     pagina_tabela(fase, df_f, inds_fase, ano_ref, use_pbf, comparar)
